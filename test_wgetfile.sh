@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 ###############################################################
-# DockServer - Universal Bootstrap Installer                  #
-# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+# DockServer - Testing Bootstrap Installer                    #
+# Configured for fork: https://github.com/fscorrupt/dockserver #
 ###############################################################
 set -e
 
@@ -20,7 +20,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}    🚀    DockServer Setup & Bootstrap                      ${NC}"
+echo -e "${BOLD}    🧪    DockServer TEST Installer (Fork: fscorrupt)       ${NC}"
 echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Update and install prerequisite tools
@@ -56,30 +56,22 @@ if [[ ! -f /usr/bin/docker-compose && -f /usr/libexec/docker/cli-plugins/docker-
     ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose
 fi
 
-# Setup /opt/dockserver
+# Target fork repository and branch
 dockserver_dir="/opt/dockserver"
-dockserver_repo="${DOCKSERVER_REPO:-https://github.com/dockserver/dockserver.git}"
-dockserver_branch="${DOCKSERVER_BRANCH:-master}"
+test_repo="${DOCKSERVER_REPO:-https://github.com/fscorrupt/dockserver.git}"
+test_branch="${DOCKSERVER_BRANCH:-master}"
 
-if [[ ! -d "$dockserver_dir" || ! -f "$dockserver_dir/.installer/dockserver" ]]; then
-    echo -e "${BLUE}==> Cloning DockServer repository ($dockserver_repo) into $dockserver_dir...${NC}"
+if [[ -d "$dockserver_dir/.git" ]]; then
+    echo -e "${BLUE}==> Existing /opt/dockserver detected. Updating from $test_repo ($test_branch)...${NC}"
+    git -C "$dockserver_dir" remote set-url origin "$test_repo" 2>/dev/null || true
+    git -C "$dockserver_dir" fetch origin "$test_branch"
+    git -C "$dockserver_dir" checkout -f "$test_branch"
+    git -C "$dockserver_dir" reset --hard "origin/$test_branch"
+else
+    echo -e "${BLUE}==> Fresh clone of $test_repo ($test_branch) into $dockserver_dir...${NC}"
+    rm -rf "$dockserver_dir"
     mkdir -p "$dockserver_dir"
-    if command -v git >/dev/null 2>&1; then
-        git clone -b "$dockserver_branch" "$dockserver_repo" "$dockserver_dir" 2>/dev/null || git clone "$dockserver_repo" "$dockserver_dir" || true
-    fi
-
-    # Fallback to docker container unpack if git clone fails
-    if [[ ! -f "$dockserver_dir/.installer/dockserver" ]]; then
-        echo -e "${YELLOW}Falling back to container image extraction...${NC}"
-        docker pull -q ghcr.io/dockserver/docker-dockserver:latest || true
-        docker run --rm -v "$dockserver_dir:/opt/dockserver" ghcr.io/dockserver/docker-dockserver:latest || true
-    fi
-elif [[ -d "$dockserver_dir/.git" && -n "$DOCKSERVER_REPO" ]]; then
-    echo -e "${BLUE}==> Updating existing repository with $dockserver_repo ($dockserver_branch)...${NC}"
-    git -C "$dockserver_dir" remote set-url origin "$dockserver_repo" 2>/dev/null || true
-    git -C "$dockserver_dir" fetch origin "$dockserver_branch" 2>/dev/null || true
-    git -C "$dockserver_dir" checkout -f "$dockserver_branch" 2>/dev/null || true
-    git -C "$dockserver_dir" reset --hard "origin/$dockserver_branch" 2>/dev/null || true
+    git clone -b "$test_branch" "$test_repo" "$dockserver_dir"
 fi
 
 # Link CLI executable
@@ -92,14 +84,14 @@ fi
 
 echo ""
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}${BOLD}    🚀    DockServer Ready!                                 ${NC}"
+echo -e "${GREEN}${BOLD}    🧪    DockServer Test Environment Ready!                ${NC}"
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo "   Repository: $test_repo"
+echo "   Branch:     $test_branch"
 echo ""
 echo "   To launch the interactive control panel:"
 echo "     dockserver -i"
-echo ""
-echo "   To view all commands:"
-echo "     dockserver -h"
 echo ""
 echo "   To upgrade an existing installation:"
 echo "     dockserver -m"
