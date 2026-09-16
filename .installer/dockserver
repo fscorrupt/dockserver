@@ -37,7 +37,20 @@ sync_env() {
     fi
 }
 
+ensure_docker() {
+    if [[ -f "$dockserver/scripts/docker/ensure_docker.sh" ]]; then
+        bash "$dockserver/scripts/docker/ensure_docker.sh"
+    elif ! docker info >/dev/null 2>&1; then
+        systemctl unmask docker.service docker.socket containerd 2>/dev/null || true
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable --now containerd docker.socket docker.service 2>/dev/null || true
+        systemctl restart docker.service 2>/dev/null || systemctl start docker.service 2>/dev/null || true
+        sleep 2
+    fi
+}
+
 run_installer() {
+    ensure_docker
     if [[ -d "$dockserver" ]]; then
         sync_env
         cd "$dockserver"
@@ -75,6 +88,7 @@ update_containers() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "    🚀  DockServer [ UPDATE CONTAINERS ] STARTED"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    ensure_docker
     sync_env
     if [[ -f "$basefolder/compose/docker-compose.yml" ]]; then
         cd "$basefolder/compose"
@@ -92,6 +106,7 @@ fastapp() {
         echo "Please specify an app name: dockserver -a <app_name>"
         exit 1
     fi
+    ensure_docker
     sync_env
 
     local found_file

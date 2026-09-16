@@ -39,6 +39,37 @@ get_compose_cmd() {
 }
 DOCKER_COMPOSE=$(get_compose_cmd)
 
+# Helper: Ensure Docker daemon is active and responsive
+ensure_docker() {
+    if [[ -f "/opt/dockserver/scripts/docker/ensure_docker.sh" ]]; then
+        bash "/opt/dockserver/scripts/docker/ensure_docker.sh"
+        return $?
+    fi
+
+    if docker info >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo -e "${YELLOW}Docker daemon is not running. Attempting to start docker.service...${NC}"
+    systemctl unmask docker.service docker.socket containerd 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl enable --now containerd docker.socket docker.service 2>/dev/null || true
+    systemctl restart docker.service 2>/dev/null || systemctl start docker.service 2>/dev/null || true
+
+    local attempts=15
+    while [[ $attempts -gt 0 ]]; do
+        if docker info >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+        attempts=$((attempts - 1))
+    done
+
+    echo -e "${RED}Error: Cannot connect to Docker daemon at unix:///var/run/docker.sock.${NC}"
+    read -erp "Press [ENTER] to return to menu..." _ </dev/tty
+    return 1
+}
+
 # Helper: Run env migrate
 sync_env() {
     if [[ -f "$appfolder/apps/.subactions/envmigrate.sh" ]]; then
@@ -136,6 +167,7 @@ prompt_password() {
     read -s -erp "Enter Authelia admin password: " input_pass </dev/tty
     echo ""
     if [[ -n "$input_pass" ]]; then
+        ensure_docker || return 1
         echo -e "${BLUE}Generating secure Argon2id password hash...${NC}"
         # Pull authelia image if needed to generate hash
         docker pull -q docker.io/authelia/authelia:latest >/dev/null 2>&1 || true
@@ -353,6 +385,7 @@ bootstrap_crowdsec() {
 }
 
 deploy_stack() {
+    ensure_docker || return 1
     copy_templates
     sync_env
 
@@ -371,6 +404,12 @@ deploy_stack() {
         echo -e "${RED}Error: Please configure your Cloudflare Global API Key before deploying.${NC}"
         sleep 2
         return 1
+    fi
+
+    # Ensure Authelia password has been hashed
+    if [[ ! -f "$basefolder/authelia/users_database.yml" ]] || grep -q '<PASSWORD>' "$basefolder/authelia/users_database.yml" 2>/dev/null; then
+        echo -e "${YELLOW}Authelia admin password has not been generated yet.${NC}"
+        prompt_password
     fi
 
     detect_server_ip

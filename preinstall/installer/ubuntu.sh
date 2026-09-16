@@ -190,10 +190,14 @@ install_docker() {
         fi
     fi
     systemctl reload-or-restart docker.service 2>/dev/null || true
-    systemctl enable docker.service 2>/dev/null || true
+    systemctl enable --now docker.socket docker.service 2>/dev/null || true
+
+    if [[ -f "/opt/dockserver/scripts/docker/ensure_docker.sh" ]]; then
+        bash "/opt/dockserver/scripts/docker/ensure_docker.sh" >/dev/null 2>&1 || true
+    fi
 
     # Install local-persist plugin for unionfs volume
-    if ! docker volume ls | grep -q 'unionfs'; then
+    if ! docker volume ls 2>/dev/null | grep -q 'unionfs'; then
         curl --silent -fsSL https://raw.githubusercontent.com/dockserver/local-persist/master/scripts/install.sh | bash >/dev/null 2>&1 || true
         docker volume create -d local-persist -o mountpoint=/mnt --name=unionfs 2>/dev/null || true
     fi

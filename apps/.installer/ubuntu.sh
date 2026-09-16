@@ -47,7 +47,11 @@ sync_env() {
 }
 
 check_traefik_prereq() {
-    if ! docker ps -a --format '{{.Names}}' | grep -qE '^traefik$'; then
+    if [[ -f "/opt/dockserver/scripts/docker/ensure_docker.sh" ]]; then
+        bash "/opt/dockserver/scripts/docker/ensure_docker.sh" >/dev/null 2>&1 || true
+    fi
+
+    if ! docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qE '^traefik$'; then
         echo ""
         echo -e "${RED}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${RED}${BOLD}  ⛔  Traefik & Edge Gateway must be deployed first!      ${NC}"

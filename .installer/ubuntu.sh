@@ -99,6 +99,25 @@ headinterface() {
         sync_env
         clear
 
+        local docker_status
+        if docker info >/dev/null 2>&1; then
+            docker_status="${GREEN}Active${NC}"
+        else
+            if [[ -f "$dockserver/scripts/docker/ensure_docker.sh" ]]; then
+                bash "$dockserver/scripts/docker/ensure_docker.sh" >/dev/null 2>&1 || true
+            else
+                systemctl unmask docker.service docker.socket containerd 2>/dev/null || true
+                systemctl daemon-reload 2>/dev/null || true
+                systemctl enable --now containerd docker.socket docker.service 2>/dev/null || true
+                systemctl restart docker.service 2>/dev/null || systemctl start docker.service 2>/dev/null || true
+            fi
+            if docker info >/dev/null 2>&1; then
+                docker_status="${GREEN}Active${NC}"
+            else
+                docker_status="${RED}Inactive (Failed to start)${NC}"
+            fi
+        fi
+
         local traefik_status
         traefik_status=$(get_status "traefik")
         local crowdsec_status
@@ -111,6 +130,7 @@ headinterface() {
         echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "  Domain:             ${CYAN}${DOMAIN:-example.com}${NC}"
         echo -e "  Server Environment: ${YELLOW}${SERVER_MODE:-cloud}${NC}"
+        echo -e "  Docker Engine:      $docker_status"
         echo -e "  Traefik Proxy:      $traefik_status"
         echo -e "  CrowdSec IPS:       $crowdsec_status"
         echo -e "  Authelia Gateway:   $authelia_status"
@@ -128,9 +148,15 @@ headinterface() {
 
         case $headsection in
             1)
+                if [[ -f "$dockserver/scripts/docker/ensure_docker.sh" ]]; then
+                    bash "$dockserver/scripts/docker/ensure_docker.sh"
+                fi
                 cd "$dockserver/traefik" && bash install.sh
                 ;;
             2)
+                if [[ -f "$dockserver/scripts/docker/ensure_docker.sh" ]]; then
+                    bash "$dockserver/scripts/docker/ensure_docker.sh"
+                fi
                 cd "$dockserver/apps" && bash install.sh
                 ;;
             3)

@@ -30,19 +30,19 @@ export NEEDRESTART_MODE=a
 apt-get update -yqq
 apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" curl git jq tar pigz pv rsync ca-certificates gnupg
 
-# Install Docker Engine & Compose Plugin if not present
-if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
-    echo -e "${BLUE}==> Installing modern Docker Engine & Docker Compose v2...${NC}"
+# Docker installation routine
+install_docker_packages() {
+    echo -e "${BLUE}==> Installing/Repairing Docker Engine & Docker Compose v2...${NC}"
     install -m 0755 -d /etc/apt/keyrings
 
     # Clean up lingering socket/service if replacing existing packages
     systemctl stop docker.socket docker.service 2>/dev/null || true
     systemctl daemon-reload 2>/dev/null || true
 
-    lsb_dist="ubuntu"
+    local lsb_dist="ubuntu"
     if [[ -r /etc/os-release ]]; then
-        os_id="$(. /etc/os-release && echo "$ID")"
-        os_like="$(. /etc/os-release && echo "${ID_LIKE:-}")"
+        local os_id="$(. /etc/os-release && echo "$ID")"
+        local os_like="$(. /etc/os-release && echo "${ID_LIKE:-}")"
         if [[ "$os_id" == "debian" || "$os_like" =~ debian ]]; then
             lsb_dist="debian"
         else
@@ -51,10 +51,11 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
     fi
 
     if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
-        curl -fsSL "https://download.docker.com/linux/${lsb_dist}/gpg" -o /etc/apt/keyrings/docker.asc
-        chmod a+r /etc/apt/keyrings/docker.asc
+        curl -fsSL "https://download.docker.com/linux/${lsb_dist}/gpg" -o /etc/apt/keyrings/docker.asc 2>/dev/null || true
+        chmod a+r /etc/apt/keyrings/docker.asc 2>/dev/null || true
     fi
 
+    local codename
     codename="$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")"
     if [[ -z "$codename" ]] && command -v lsb_release >/dev/null 2>&1; then
         codename="$(lsb_release -cs)"
@@ -69,7 +70,7 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
 
     # Live probe: if Docker repository does not exist for this codename (e.g. Ubuntu 26 / non-LTS releases),
     # fallback to verified LTS to prevent apt 404 errors
-    check_url="https://download.docker.com/linux/${lsb_dist}/dists/${codename}/Release"
+    local check_url="https://download.docker.com/linux/${lsb_dist}/dists/${codename}/Release"
     if ! curl -fsSL --max-time 5 --head "$check_url" >/dev/null 2>&1; then
         if [[ "$lsb_dist" == "debian" ]]; then
             codename="bookworm"
@@ -82,12 +83,65 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
     apt-get update -yqq
     apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
         docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin crun || apt-get install -f -yqq || true
+}
 
+ensure_docker_daemon() {
+    if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+        install_docker_packages
+    fi
+
+    if docker info >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo -e "${BLUE}==> Docker daemon is not active. Automatically starting Docker service...${NC}"
+    systemctl unmask docker.service docker.socket containerd 2>/dev/null || true
     systemctl daemon-reload 2>/dev/null || true
-    systemctl unmask docker.service docker.socket 2>/dev/null || true
-    systemctl enable docker.service 2>/dev/null || true
+    systemctl enable --now containerd 2>/dev/null || true
+    systemctl restart containerd 2>/dev/null || systemctl start containerd 2>/dev/null || true
+    systemctl enable --now docker.socket docker.service 2>/dev/null || true
     systemctl restart docker.service 2>/dev/null || systemctl start docker.service 2>/dev/null || true
-fi
+
+    local attempts=15
+    while [[ $attempts -gt 0 ]]; do
+        if docker info >/dev/null 2>&1; then
+            echo -e "${GREEN}==> Docker daemon is active and responsive!${NC}"
+            return 0
+        fi
+        sleep 1
+        attempts=$((attempts - 1))
+    done
+
+    # Self-healing fallback if daemon.json was corrupt
+    if [[ -f /etc/docker/daemon.json ]]; then
+        echo -e "${YELLOW}==> Testing recovery by clearing /etc/docker/daemon.json...${NC}"
+        mv -f /etc/docker/daemon.json /etc/docker/daemon.json.corrupt_bak 2>/dev/null || true
+        systemctl restart docker.service 2>/dev/null || true
+        sleep 3
+        if docker info >/dev/null 2>&1; then
+            echo -e "${GREEN}==> Docker recovered successfully!${NC}"
+            return 0
+        fi
+    fi
+
+    echo -e "${YELLOW}==> Docker daemon still inactive. Running automated package repair...${NC}"
+    install_docker_packages
+    systemctl restart containerd 2>/dev/null || true
+    systemctl restart docker.service 2>/dev/null || true
+    sleep 3
+
+    if docker info >/dev/null 2>&1; then
+        echo -e "${GREEN}==> Docker daemon is active and responsive!${NC}"
+        return 0
+    else
+        echo -e "${RED}Error: Docker daemon could not be started automatically.${NC}"
+        journalctl -u docker.service -n 15 --no-pager 2>/dev/null || true
+        return 1
+    fi
+}
+
+# Ensure Docker daemon is active and responsive
+ensure_docker_daemon
 
 # Compatibility symlink
 if [[ ! -f /usr/bin/docker-compose && -f /usr/libexec/docker/cli-plugins/docker-compose ]]; then
