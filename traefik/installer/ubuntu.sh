@@ -102,6 +102,13 @@ init_directories() {
     chmod 644 "$basefolder/traefik/logs/"*.log || true
     chmod 644 "$basefolder/authelia/authelia.log" || true
     chown -R 1000:1000 "$basefolder/authelia" "$basefolder/crowdsec" "$basefolder/traefik-dashboard" || true
+
+    # Ensure external Docker proxy network exists
+    local net_name="${DOCKERNETWORK:-proxy}"
+    if ! docker network inspect "$net_name" >/dev/null 2>&1; then
+        echo -e "${BLUE}Creating external Docker network '${net_name}'...${NC}"
+        docker network create --driver=bridge "$net_name" 2>/dev/null || true
+    fi
 }
 
 copy_templates() {
@@ -323,6 +330,13 @@ bootstrap_crowdsec() {
     local ddns_whitelist="$basefolder/crowdsec/config/postoverflows/s01-whitelist/ddns-whitelist.yaml"
     if [[ -f "$ddns_whitelist" && -n "$DOMAIN" && "$DOMAIN" != "example.com" ]]; then
         sed -i "s/vpn\.example\.com/vpn.$DOMAIN/g" "$ddns_whitelist" 2>/dev/null || true
+    fi
+
+    # Ensure external proxy network exists
+    local net_name="${DOCKERNETWORK:-proxy}"
+    if ! docker network inspect "$net_name" >/dev/null 2>&1; then
+        echo -e "${BLUE}Creating external Docker network '${net_name}'...${NC}"
+        docker network create --driver=bridge "$net_name" 2>/dev/null || true
     fi
 
     # Start CrowdSec engine first

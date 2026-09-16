@@ -64,6 +64,14 @@ install_docker_packages() {
         docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin crun || apt-get install -f -yqq || true
 }
 
+ensure_proxy_network() {
+    local net_name="${DOCKERNETWORK:-proxy}"
+    if ! docker network inspect "$net_name" >/dev/null 2>&1; then
+        echo -e "${BLUE}==> Creating default external Docker network '${net_name}'...${NC}"
+        docker network create --driver=bridge "$net_name" 2>/dev/null || true
+    fi
+}
+
 ensure_docker_daemon() {
     # 1. Check if docker and docker compose commands exist
     if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
@@ -72,6 +80,7 @@ ensure_docker_daemon() {
 
     # 2. Check if Docker daemon is already alive and responsive
     if docker info >/dev/null 2>&1; then
+        ensure_proxy_network
         return 0
     fi
 
@@ -88,6 +97,7 @@ ensure_docker_daemon() {
     while [[ $attempts -gt 0 ]]; do
         if docker info >/dev/null 2>&1; then
             echo -e "${GREEN}==> Docker daemon is active and responsive!${NC}"
+            ensure_proxy_network
             return 0
         fi
         sleep 1
@@ -102,6 +112,7 @@ ensure_docker_daemon() {
         sleep 3
         if docker info >/dev/null 2>&1; then
             echo -e "${GREEN}==> Docker recovered successfully with default configuration!${NC}"
+            ensure_proxy_network
             return 0
         fi
     fi
@@ -115,6 +126,7 @@ ensure_docker_daemon() {
 
     if docker info >/dev/null 2>&1; then
         echo -e "${GREEN}==> Docker daemon is active and responsive!${NC}"
+        ensure_proxy_network
         return 0
     else
         echo -e "${RED}Error: Docker daemon could not be started automatically.${NC}"

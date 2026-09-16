@@ -143,6 +143,12 @@ ensure_docker_daemon() {
 # Ensure Docker daemon is active and responsive
 ensure_docker_daemon
 
+# Ensure default external proxy network exists
+if ! docker network inspect proxy >/dev/null 2>&1; then
+    echo -e "${BLUE}==> Creating default external Docker network 'proxy'...${NC}"
+    docker network create --driver=bridge proxy 2>/dev/null || true
+fi
+
 # Compatibility symlink
 if [[ ! -f /usr/bin/docker-compose && -f /usr/libexec/docker/cli-plugins/docker-compose ]]; then
     ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose
