@@ -211,25 +211,30 @@ runinstall() {
     cp -f "$appfolder/$cat/${app}.yml" "$compose_target"
     rm -f "$override_target"
 
-    # GPU overrides for mediaservers and encoders
+    # GPU overrides for mediaservers and encoders (requires physical /dev/dri node)
     if [[ "$cat" == "mediaserver" || "$cat" == "encoder" ]]; then
         local pci_gpus
         pci_gpus=$(lspci 2>/dev/null | grep -iE 'vga|display|3d|2d' || true)
         local chosen_gpu=""
 
-        if echo "$pci_gpus" | grep -qi 'nvidia'; then
+        if echo "$pci_gpus" | grep -qi 'nvidia' && command -v nvidia-smi >/dev/null 2>&1 && [[ -d "/dev/dri" || -e "/dev/nvidia0" ]]; then
             chosen_gpu="NVIDIA"
-        elif echo "$pci_gpus" | grep -qiE 'amd|ati|radeon'; then
-            chosen_gpu="AMD"
-        elif echo "$pci_gpus" | grep -qi 'intel'; then
-            chosen_gpu="Intel"
         elif [[ -d "/dev/dri" ]]; then
-            chosen_gpu="Intel"
+            if echo "$pci_gpus" | grep -qiE 'amd|ati|radeon'; then
+                chosen_gpu="AMD"
+            elif echo "$pci_gpus" | grep -qi 'intel'; then
+                chosen_gpu="Intel"
+            else
+                chosen_gpu="Intel"
+            fi
+        else
+            echo -e "${YELLOW}Notice: No /dev/dri hardware node present. Running ${app} in standard CPU mode.${NC}"
         fi
 
         if [[ -n "$chosen_gpu" && -f "$appfolder/$cat/.gpu/$chosen_gpu.yml" ]]; then
             cp -f "$appfolder/$cat/.gpu/$chosen_gpu.yml" "$override_target"
             sed -i "s/<APP>/${app}/g" "$override_target" 2>/dev/null || true
+            echo -e "${GREEN}Applied hardware acceleration override (${chosen_gpu}).${NC}"
         fi
     fi
 
