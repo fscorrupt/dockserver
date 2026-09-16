@@ -26,17 +26,28 @@ echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━
 # Update and install prerequisite tools
 echo -e "${BLUE}==> Installing prerequisite packages...${NC}"
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 apt-get update -yqq
-apt-get install -yqq curl git jq tar pigz pv rsync ca-certificates gnupg
+apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" curl git jq tar pigz pv rsync ca-certificates gnupg
 
 # Install Docker Engine & Compose Plugin if not present
 if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
     echo -e "${BLUE}==> Installing modern Docker Engine & Docker Compose v2...${NC}"
     install -m 0755 -d /etc/apt/keyrings
 
+    # Clean up lingering socket/service if replacing existing packages
+    systemctl stop docker.socket docker.service 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
+
     lsb_dist="ubuntu"
     if [[ -r /etc/os-release ]]; then
-        lsb_dist="$(. /etc/os-release && echo "$ID")"
+        os_id="$(. /etc/os-release && echo "$ID")"
+        os_like="$(. /etc/os-release && echo "${ID_LIKE:-}")"
+        if [[ "$os_id" == "debian" || "$os_like" =~ debian ]]; then
+            lsb_dist="debian"
+        else
+            lsb_dist="ubuntu"
+        fi
     fi
 
     if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
@@ -69,7 +80,13 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${lsb_dist} ${codename} stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
     apt-get update -yqq
-    apt-get install -yqq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
+        docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin crun || apt-get install -f -yqq || true
+
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl unmask docker.service docker.socket 2>/dev/null || true
+    systemctl enable docker.service 2>/dev/null || true
+    systemctl restart docker.service 2>/dev/null || systemctl start docker.service 2>/dev/null || true
 fi
 
 # Compatibility symlink
