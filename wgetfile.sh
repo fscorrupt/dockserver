@@ -124,8 +124,10 @@ fi
 if [[ -f "$dockserver_dir/.installer/dockserver" ]]; then
     chmod +x "$dockserver_dir/.installer/dockserver"
     cp -f "$dockserver_dir/.installer/dockserver" /usr/bin/dockserver
-    ln -sf /usr/bin/dockserver /bin/dockserver
-    chmod +x /usr/bin/dockserver /bin/dockserver
+    chmod +x /usr/bin/dockserver
+    if [[ ! -L /bin && -d /bin && ! -f /bin/dockserver ]]; then
+        ln -sf /usr/bin/dockserver /bin/dockserver 2>/dev/null || true
+    fi
 fi
 
 echo ""
