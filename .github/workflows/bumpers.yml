@@ -17,7 +17,7 @@ jobs:
          private-key: "${{ secrets.BOT_APP_PRIVATE_KEY }}"
 
     - name: Check out code
-      uses: actions/checkout@v7
+      uses: actions/checkout@v7.0.1
       with:
         token: "${{ steps.app-token.outputs.token }}"
         fetch-depth: '0'
@@ -31,11 +31,11 @@ jobs:
          GITHUB_TOKEN: "${{ steps.app-token.outputs.token }}"
 
     - name: Create Release
-      uses: softprops/action-gh-release@v3
+      uses: actions/create-release@v1
       with:
         tag_name: ${{ github.ref }}
-        name: ${{ github.ref_name }}
-        body: ${{ steps.github_release.outputs.changelog }}
+        release_name: ${{ github.ref }}
+        body: ${{steps.github_release.outputs.changelog}}
       env:
         GITHUB_TOKEN: "${{ steps.app-token.outputs.token }}"
 
