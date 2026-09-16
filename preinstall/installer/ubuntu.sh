@@ -26,7 +26,7 @@ if [[ -f "$env_file" ]]; then
     # shellcheck disable=SC1090
     source "$env_file"
 fi
-SERVER_MODE="${SERVER_MODE:-cloud}"
+SERVER_MODE="${SERVER_MODE:-local}"
 
 oldsinstall() {
     oldsolutions="plexguide cloudbox gooby sudobox sbox pandaura salty"

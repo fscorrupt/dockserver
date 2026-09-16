@@ -246,12 +246,12 @@ prompt_servermode() {
     echo ""
     echo -e "${CYAN}${BOLD}==> Server Environment Mode${NC}"
     echo "Select where this DockServer is hosted:"
-    echo "  [ 1 ] Cloud Server (VPS / Dedicated e.g. Hetzner, Vultr, Netcup)"
-    echo "  [ 2 ] Local Server (Home Lab / Bare-metal LAN - disables cloud mount & uploader)"
-    read -erp "Choice [1/2] (Current: ${SERVER_MODE:-cloud}): " mode_choice </dev/tty
+    echo "  [ 1 ] Local Server (Home Lab / Bare-metal LAN - disables cloud mount & uploader) [DEFAULT]"
+    echo "  [ 2 ] Cloud Server (VPS / Dedicated e.g. Hetzner, Vultr, Netcup)"
+    read -erp "Choice [1/2] (Current: ${SERVER_MODE:-local}): " mode_choice </dev/tty
     case $mode_choice in
-        2|local|Local|LOCAL) SERVER_MODE="local" ;;
-        *) SERVER_MODE="cloud" ;;
+        2|cloud|Cloud|CLOUD) SERVER_MODE="cloud" ;;
+        *) SERVER_MODE="local" ;;
     esac
     sed -i "/^SERVER_MODE=/d" "$env_file" 2>/dev/null || true
     echo "SERVER_MODE=$SERVER_MODE" >> "$env_file"
@@ -451,7 +451,7 @@ deploy_stack() {
     echo -e "  Traefik Proxy:       ${CYAN}https://traefik.${DOMAIN}${NC}"
     echo -e "  Authelia SSO / MFA:  ${CYAN}https://authelia.${DOMAIN}${NC}"
     echo -e "  Traefik Dashboard:   ${CYAN}https://traefik-dashboard.${DOMAIN}${NC}"
-    echo -e "  Server Environment:  ${YELLOW}${SERVER_MODE:-cloud}${NC}"
+    echo -e "  Server Environment:  ${YELLOW}${SERVER_MODE:-local}${NC}"
     echo ""
     echo -e "  ${BOLD}Security Stack Status:${NC}"
     echo -e "  • CrowdSec IPS:      ${GREEN}Active${NC} (Parsing Traefik access logs)"
@@ -477,7 +477,7 @@ main_menu() {
         echo -e "  ${BOLD}[4] Cloudflare Email:${NC}         ${YELLOW}${CLOUDFLARE_EMAIL:-Not set}${NC}"
         echo -e "  ${BOLD}[5] Cloudflare Global Key:${NC}    ${YELLOW}${CLOUDFLARE_API_KEY:+Configured (Hidden)}${CLOUDFLARE_API_KEY:-Not set}${NC}"
         echo -e "  ${BOLD}[6] Cloudflare Zone ID:${NC}       ${YELLOW}${DOMAIN1_ZONE_ID:-Not set}${NC}"
-        echo -e "  ${BOLD}[7] Server Environment Mode:${NC}  ${GREEN}${SERVER_MODE:-cloud}${NC}"
+        echo -e "  ${BOLD}[7] Server Environment Mode:${NC}  ${GREEN}${SERVER_MODE:-local}${NC}"
         echo ""
         echo -e "${CYAN}──────────────────────────────────────────────────────────────────────────${NC}"
         echo -e "  ${GREEN}${BOLD}[ D ] Deploy Edge Gateway Stack (Traefik + CrowdSec + Authelia)${NC}"

@@ -118,7 +118,7 @@ fastapp() {
         echo "Deploying $APP from category $cat_name..."
 
         # Check Local server restrictions
-        if [[ "${SERVER_MODE:-cloud}" == "local" && ("$APP" == "mount" || "$APP" == "uploader") ]]; then
+        if [[ "${SERVER_MODE:-local}" == "local" && ("$APP" == "mount" || "$APP" == "uploader") ]]; then
             echo "Error: '$APP' is a cloud-only utility and cannot be installed in Local Server mode."
             exit 1
         fi

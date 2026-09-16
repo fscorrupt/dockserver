@@ -50,7 +50,7 @@ get_status() {
 
 toggle_servermode() {
     sync_env
-    local current="${SERVER_MODE:-cloud}"
+    local current="${SERVER_MODE:-local}"
     local new_mode="cloud"
     if [[ "$current" == "cloud" ]]; then
         new_mode="local"
@@ -164,7 +164,7 @@ headinterface() {
         echo -e "${BOLD}    🚀  DockServer - Unified Orchestration Platform                       ${NC}"
         echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "  Domain:             ${CYAN}${DOMAIN:-example.com}${NC}"
-        echo -e "  Server Environment: ${YELLOW}${SERVER_MODE:-cloud}${NC}"
+        echo -e "  Server Environment: ${YELLOW}${SERVER_MODE:-local}${NC}"
         echo -e "  Docker Engine:      $docker_status"
         echo -e "  Host Pre-Install:   $preinstall_label"
         echo -e "  Traefik Proxy:      $traefik_status"

@@ -69,8 +69,8 @@ Select **`[ 1 ] Edge Gateway`**:
 2. Set an **Authelia Username** and **Password** (used to log into your secured apps).
 3. Enter your **Cloudflare Email**, **Global API Key**, and **Zone ID**.
 4. Choose your **Server Environment Mode**:
+   - **`local`** *(Default)*: For Home Labs / bare-metal LAN servers (preserves local router DNS).
    - **`cloud`**: For VPS/Dedicated servers (Hetzner, Vultr, etc.) with cloud storage mounts.
-   - **`local`**: For Home Labs / LAN servers (preserves local router DNS).
 5. Select **`[ D ] Deploy Edge Gateway`**.
 
 Traefik v3, CrowdSec IPS, Authelia SSO, Traefik Log Dashboard, and Cloudflare Companion will bootstrap and start automatically.

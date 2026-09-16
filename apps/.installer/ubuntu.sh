@@ -150,7 +150,7 @@ app_list_menu() {
 
                 # Check Local Mode Cloud-Only tags
                 if [[ ("$app_name" == "mount" || "$app_name" == "uploader") ]]; then
-                    if [[ "${SERVER_MODE:-cloud}" == "local" ]]; then
+                    if [[ "${SERVER_MODE:-local}" == "local" ]]; then
                         echo -e "  • ${YELLOW}${app_name} [Cloud Only - Disabled in Local Mode]${NC}"
                     else
                         echo -e "  • ${app_name} (Cloud Only)"
@@ -172,7 +172,7 @@ app_list_menu() {
             *)
                 if [[ -f "$appfolder/$cat/${typed}.yml" ]]; then
                     # Check Local server restrictions
-                    if [[ "${SERVER_MODE:-cloud}" == "local" && ("$typed" == "mount" || "$typed" == "uploader") ]]; then
+                    if [[ "${SERVER_MODE:-local}" == "local" && ("$typed" == "mount" || "$typed" == "uploader") ]]; then
                         echo ""
                         echo -e "${RED}${BOLD}Notice: '${typed}' is a cloud-only utility.${NC}"
                         echo -e "Your server mode is currently set to ${YELLOW}local${NC}."

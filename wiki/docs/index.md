@@ -53,18 +53,18 @@ sudo dockserver -i
 
 ---
 
-## 🌐 Server Modes: Cloud vs. Local
+## 🌐 Server Modes: Local vs. Cloud
 
-During setup or via the CLI, choose the mode that matches your server environment:
+DockServer defaults to **`local`** mode for Home Labs and bare-metal environments, with **`cloud`** mode available for cloud VPS servers:
 
 | Mode | Best For | What It Does |
 | :--- | :--- | :--- |
+| **`local`** *(Default)* | Home Labs, bare-metal, unRAID, Proxmox LXC | Disables cloud storage mounters and preserves your local router LAN DNS. |
 | **`cloud`** | VPS / Dedicated hosts (Hetzner, Vultr, OVH) | Enables cloud mounting and remote storage tools (`mount`, `uploader`). |
-| **`local`** | Home Labs, bare-metal, unRAID, Proxmox LXC | Disables cloud storage mounters and preserves your local router LAN DNS. |
 
 Switch mode anytime:
 ```bash
-sudo dockserver --mode local    # For home / local servers
+sudo dockserver --mode local    # Default: For home / local servers
 sudo dockserver --mode cloud    # For cloud VPS servers
 ```
 
