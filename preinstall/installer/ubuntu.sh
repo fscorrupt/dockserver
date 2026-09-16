@@ -303,6 +303,24 @@ main() {
         fi
     fi
 
+    # Mark preinstallation as completed
+    mkdir -p "$basefolder"
+    cat > "$basefolder/.preinstalled" <<EOF
+DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+OS="$(. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-$ID}" || echo "Linux")"
+EOF
+    local pci_gpu
+    pci_gpu=$(lspci 2>/dev/null | grep -iE 'vga|display|3d|2d' || true)
+    if echo "$pci_gpu" | grep -qi 'nvidia'; then
+        echo "GPU=NVIDIA" >> "$basefolder/.preinstalled"
+    elif echo "$pci_gpu" | grep -qiE 'amd|ati|radeon'; then
+        echo "GPU=AMD Radeon" >> "$basefolder/.preinstalled"
+    elif echo "$pci_gpu" | grep -qi 'intel'; then
+        echo "GPU=Intel QuickSync" >> "$basefolder/.preinstalled"
+    else
+        echo "GPU=None" >> "$basefolder/.preinstalled"
+    fi
+
     echo ""
     echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}${BOLD}    🚀  Pre-Installation Complete! Ready for Edge Gateway setup.         ${NC}"

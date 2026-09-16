@@ -190,6 +190,15 @@ if [[ -f "$dockserver_dir/.installer/dockserver" ]]; then
     fi
 fi
 
+# Automatically run Host Pre-Installation & Optimization if not already done
+if [[ ! -f "/opt/appdata/.preinstalled" && -f "$dockserver_dir/preinstall/install.sh" ]]; then
+    echo ""
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}==> Running automated Host Pre-Installation & Optimization...${NC}"
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    bash "$dockserver_dir/preinstall/install.sh"
+fi
+
 echo ""
 echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}${BOLD}    🚀    DockServer Ready!                                 ${NC}"

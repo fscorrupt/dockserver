@@ -93,8 +93,25 @@ system_maintenance() {
     esac
 }
 
+ensure_preinstalled() {
+    if [[ ! -f "$basefolder/.preinstalled" && -f "$dockserver/preinstall/install.sh" ]]; then
+        clear
+        echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${BOLD}    🚀  DockServer First-Run: Host Pre-Installation & Optimization       ${NC}"
+        echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "DockServer will now automatically configure system dependencies, kernel BBR,"
+        echo "storage directories, fail2ban security, and GPU hardware acceleration."
+        echo ""
+        cd "$dockserver/preinstall" && bash install.sh
+        echo ""
+        read -erp "Host optimization completed! Press [ENTER] to launch the control panel: " _ </dev/tty
+    fi
+}
+
 headinterface() {
     updatebin
+    ensure_preinstalled
     while true; do
         sync_env
         clear
@@ -118,6 +135,19 @@ headinterface() {
             fi
         fi
 
+        local preinstall_label
+        if [[ -f "$basefolder/.preinstalled" ]]; then
+            local gpu_type
+            gpu_type=$(grep '^GPU=' "$basefolder/.preinstalled" 2>/dev/null | cut -d= -f2 || true)
+            if [[ -n "$gpu_type" && "$gpu_type" != "None" ]]; then
+                preinstall_label="${GREEN}Completed (${gpu_type})${NC}"
+            else
+                preinstall_label="${GREEN}Completed${NC}"
+            fi
+        else
+            preinstall_label="${YELLOW}Pending (Recommended)${NC}"
+        fi
+
         local traefik_status
         traefik_status=$(get_status "traefik")
         local crowdsec_status
@@ -125,19 +155,25 @@ headinterface() {
         local authelia_status
         authelia_status=$(get_status "authelia")
 
+        local pre_tag=""
+        if [[ -f "$basefolder/.preinstalled" ]]; then
+            pre_tag=" ${GREEN}[Completed]${NC}"
+        fi
+
         echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${BOLD}    🚀  DockServer - Unified Orchestration Platform                       ${NC}"
         echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "  Domain:             ${CYAN}${DOMAIN:-example.com}${NC}"
         echo -e "  Server Environment: ${YELLOW}${SERVER_MODE:-cloud}${NC}"
         echo -e "  Docker Engine:      $docker_status"
+        echo -e "  Host Pre-Install:   $preinstall_label"
         echo -e "  Traefik Proxy:      $traefik_status"
         echo -e "  CrowdSec IPS:       $crowdsec_status"
         echo -e "  Authelia Gateway:   $authelia_status"
         echo -e "${CYAN}──────────────────────────────────────────────────────────────────────────${NC}"
         echo -e "  ${BOLD}[ 1 ] Edge Gateway (Traefik v3 + CrowdSec + Authelia)${NC}"
         echo -e "  ${BOLD}[ 2 ] Applications Catalog (Install / Remove / Backup)${NC}"
-        echo -e "  ${BOLD}[ 3 ] Host Pre-Installation & Security Hardening${NC}"
+        echo -e "  ${BOLD}[ 3 ] Host Pre-Installation & Optimization${pre_tag}"
         echo -e "  ${BOLD}[ 4 ] Migration Tool (Upgrade from Legacy DockServer)${NC}"
         echo -e "  ${BOLD}[ 5 ] Toggle Server Mode [Cloud <-> Local]${NC}"
         echo -e "  ${BOLD}[ 6 ] System & Docker Maintenance${NC}"
@@ -148,12 +184,18 @@ headinterface() {
 
         case $headsection in
             1)
+                if [[ ! -f "$basefolder/.preinstalled" && -f "$dockserver/preinstall/install.sh" ]]; then
+                    cd "$dockserver/preinstall" && bash install.sh
+                fi
                 if [[ -f "$dockserver/scripts/docker/ensure_docker.sh" ]]; then
                     bash "$dockserver/scripts/docker/ensure_docker.sh"
                 fi
                 cd "$dockserver/traefik" && bash install.sh
                 ;;
             2)
+                if [[ ! -f "$basefolder/.preinstalled" && -f "$dockserver/preinstall/install.sh" ]]; then
+                    cd "$dockserver/preinstall" && bash install.sh
+                fi
                 if [[ -f "$dockserver/scripts/docker/ensure_docker.sh" ]]; then
                     bash "$dockserver/scripts/docker/ensure_docker.sh"
                 fi

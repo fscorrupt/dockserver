@@ -400,6 +400,13 @@ bootstrap_crowdsec() {
 
 deploy_stack() {
     ensure_docker || return 1
+
+    # Ensure Host Pre-Installation has been completed
+    if [[ ! -f "$basefolder/.preinstalled" && -f "/opt/dockserver/preinstall/install.sh" ]]; then
+        echo -e "${CYAN}${BOLD}==> Applying Host Pre-Installation & System Hardening...${NC}"
+        bash "/opt/dockserver/preinstall/install.sh"
+    fi
+
     copy_templates
     sync_env
 
