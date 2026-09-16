@@ -1,0 +1,6 @@
+name: local/vpn-whitelist
+description: "Whitelist dynamic home IP via DNS-only hostname"
+whitelist:
+  reason: "Dynamic home IP"
+  expression:
+    - evt.Overflow.Alert.Source.IP in LookupHost('vpn.example.com')

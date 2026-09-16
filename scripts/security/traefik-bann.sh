@@ -1,28 +1,34 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
-export logfile=/opt/appdata/traefik/traefik.log
-while true;do
-  tail -n 15 "${logfile}" | grep --line-buffered '/_ignition/execute-solution' | sed '/banned/d' | awk '{print $1}'  | while read line; do
-     iptables -A INPUT -s $line -j DROP
-     sed -i "s#$line#banned#g" "${logfile}"
-     sleep 5
-  done
-  tail -n 50 "${logfile}" | grep --line-buffered '/?x=${jndi:' | sed '/banned/d' | awk '{print $1}'  | while read line; do
-     iptables -A INPUT -s $line -j DROP
-     sed -i "s#$line#banned#g" "${logfile}"
-     sleep 5
-  done
- sleep 5
+###############################################################
+# DockServer - Traefik Legacy Active Log Banning Daemon       #
+# (CrowdSec IPS is the primary defense engine)                #
+###############################################################
+set -e
+
+logfile="/opt/appdata/traefik/logs/traefik.log"
+if [[ ! -f "$logfile" && -f "/opt/appdata/traefik/traefik.log" ]]; then
+    logfile="/opt/appdata/traefik/traefik.log"
+fi
+
+banned_file="/opt/appdata/traefik/logs/banned.ips"
+mkdir -p "$(dirname "$banned_file")"
+touch "$banned_file"
+
+echo "Starting Traefik log monitor daemon..."
+
+while true; do
+    if [[ -f "$logfile" ]]; then
+        # Check for exploit patterns in recent logs
+        tail -n 100 "$logfile" 2>/dev/null | grep -E '/_ignition/execute-solution|/\?x=\$\{jndi:' 2>/dev/null | awk '{print $1}' | while read -r ip; do
+            if [[ -n "$ip" && "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                if ! grep -xq "$ip" "$banned_file"; then
+                    echo "Dropping malicious exploit IP: $ip"
+                    iptables -I INPUT -s "$ip" -j DROP 2>/dev/null || true
+                    echo "$ip" >> "$banned_file"
+                fi
+            fi
+        done
+    fi
+    sleep 10
 done

@@ -1,22 +1,19 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-# Copyright (c) 2020, MrDoob
-# All rights reserved.
-#########################################################################
-# Author:         l3uddz / m-rots && cloudbox                           #
-# Docker:         https://github.com/Cloudbox/autoscan                  #
-# URL:            https://github.com/Cloudbox/autoscan                  #
-#         Part of the Cloudbox project: https://cloudbox.works          #
-#########################################################################
-#                   GNU General Public License v3.0                     #
-#########################################################################
+###############################################################
+# DockServer - Autoscan Configuration Helper                  #
+###############################################################
+set -e
 
 basefolder="/opt/appdata"
 appfolder="/opt/dockserver/apps/"
-typed=autoscan
+typed="autoscan"
 composeoverwrite="compose/docker-compose.override.yml"
+
 headrm() {
-if [[ -f $basefolder/${typed}/autoscan.db ]];then $(command -v rm) -rf $basefolder/${typed}/autoscan.db;fi
+    if [[ -f "$basefolder/${typed}/autoscan.db" ]]; then
+        rm -f "$basefolder/${typed}/autoscan.db"
+    fi
 }
 anchor() {
 if [[ ! -x $(command -v unzip) ]];then $(command -v apt) install unzip -yqq 1>/dev/null 2>&1;fi

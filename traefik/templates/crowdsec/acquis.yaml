@@ -1,0 +1,8 @@
+# ==============================================================================
+# CrowdSec Acquisition Configuration
+# Tells CrowdSec to monitor Traefik's JSON access logs
+# ==============================================================================
+filenames:
+  - /var/log/traefik/access.log
+labels:
+  type: traefik

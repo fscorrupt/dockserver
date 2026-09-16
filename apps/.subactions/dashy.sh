@@ -1,34 +1,20 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
+###############################################################
+# DockServer - Dashy Setup Helper                             #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
 
 FOLDER="/opt/appdata"
 CONF="${FOLDER}/dashy/conf.yml"
 appfolder="/opt/dockserver/apps"
 FILE=".subactions/dashy.j2"
 
-appstartup() {
-   if [[ -f $CONF ]]; then
-      $(command -v chown) -cR 1000:1000 $FOLDER/dashy
-   fi
+mkdir -p "${FOLDER}/dashy"
 
-   if [[ ! -f $CONF ]]; then
-      $(command -v mkdir) -p $FOLDER/dashy
-      $(command -v rsync) $appfolder/$FILE $CONF -aqhv
-      $(command -v chown) -cR 1000:1000 $FOLDER/dashy
-   fi
-}
+if [[ ! -f "$CONF" && -f "$appfolder/$FILE" ]]; then
+    cp -f "$appfolder/$FILE" "$CONF"
+fi
 
-appstartup
-#"
+chown -R 1000:1000 "$FOLDER/dashy" 2>/dev/null || true

@@ -1,74 +1,85 @@
-### **DockServer**
+# Installation Guide
 
-
-## Pre-Install
-
-1. Login to your Cloudflare Account & goto DNS click on Add record.
-1. Add 1 **A-Record** pointed to your server's ip.
-1. Copy your [CloudFlare-Global-Key](https://support.cloudflare.com/hc/en-us/articles/200167836-Managing-API-Tokens-and-Keys) and [CloudFlare-Zone-ID](https://support.cloudflare.com/hc/en-us/articles/200167836-Managing-API-Tokens-and-Keys).
+Setting up DockServer takes just a few minutes. Follow these simple steps to install and configure your server.
 
 ---
 
-## Set the following on Cloudflare
+## 📋 Prerequisites & System Requirements
 
-1. `SSL = FULL` **( not FULL/STRICT )**
-1. `Always on = YES`
-1. `HTTP to HTTPS = YES`
-1. `RocketLoader and Broli / Onion Routing = NO`
-1. `TLS min = 1.2`
-1. `TLS = v1.3`
+- **Operating System**:
+  - Ubuntu 24.04 LTS
+  - Ubuntu 22.04 LTS
+  - Debian 12
+- **Hardware**:
+  - 2+ CPU cores (4+ cores recommended for media transcoding)
+  - 4 GB+ RAM (8 GB+ recommended)
+  - 20 GB+ free disk space
+- **Cloudflare Account**:
+  - A registered domain (free or paid) with DNS nameservers pointed to Cloudflare.
+  - Free Cloudflare account tier is completely sufficient.
 
 ---
 
-### Update System before you begin with installation
+## Step 1: Prepare Cloudflare DNS
 
-```sh
-sudo apt-get update -yqq
-sudo apt-get upgrade -yqq
-sudo apt-get autoclean -yqq
-```
+DockServer uses Cloudflare to automatically issue wildcard SSL certificates (`*.yourdomain.com`) and create subdomains for all your apps.
 
-### Easy Mode install
+1. In your [Cloudflare Dashboard](https://dash.cloudflare.com/), navigate to your domain's **DNS** tab.
+2. Add an **A-Record**:
+   - **Type**: `A`
+   - **Name**: `@` (or your root domain)
+   - **IPv4 Address**: Your server's public IP
+   - **Proxy Status**: `Proxied` (Orange cloud) or `DNS only` (Grey cloud)
+3. In **SSL/TLS** settings:
+   - Set encryption mode to **Full** *(do not use Full/Strict until certificates are issued)*.
+   - Enable **Always Use HTTPS**.
+4. Retrieve your credentials:
+   - **Cloudflare Email**: Your Cloudflare login email.
+   - **Global API Key**: Go to **My Profile** > **API Tokens** > **Global API Key** > **View**.
+   - **Zone ID**: Found on your domain's **Overview** page in the right sidebar.
 
-Run the following command:
+---
 
-```sh
-sudo wget -qO- https://git.io/J3GDc | sudo bash
-```
+## Step 2: Run the One-Line Installer
 
-<details>
-  <summary>Long commmand if the short one doesn't work.</summary>
-  <br />
+Connect to your server via SSH and execute:
 
-```sh
+```bash
 sudo wget -qO- https://raw.githubusercontent.com/dockserver/dockserver/master/wgetfile.sh | sudo bash
 ```
 
-</details>
+The installer will:
+- Install official Docker Engine and Docker Compose v2.
+- Configure system prerequisites and Docker networking.
+- Install the `dockserver` CLI tool to `/usr/bin/dockserver`.
 
+---
 
-### Open the dockserver Interface 
+## Step 3: Launch Setup
 
-```sh
+Start the interactive control center:
+
+```bash
 sudo dockserver -i
 ```
 
-- Now the preinstall runs full automatic
-- If not triggered by installer, please restart your server.
+### 1. Deploy the Edge Gateway
+Select **`[ 1 ] Edge Gateway`**:
+1. Enter your **Domain Name** (e.g. `yourdomain.com`).
+2. Set an **Authelia Username** and **Password** (used to log into your secured apps).
+3. Enter your **Cloudflare Email**, **Global API Key**, and **Zone ID**.
+4. Choose your **Server Environment Mode**:
+   - **`cloud`**: For VPS/Dedicated servers (Hetzner, Vultr, etc.) with cloud storage mounts.
+   - **`local`**: For Home Labs / LAN servers (preserves local router DNS).
+5. Select **`[ D ] Deploy Edge Gateway`**.
 
----
+Traefik v3, CrowdSec IPS, Authelia SSO, Traefik Log Dashboard, and Cloudflare Companion will bootstrap and start automatically.
 
-### Install Traefik & Authelia first 
+### 2. Deploy Applications
+Select **`[ 2 ] Applications Catalog`** to install:
+- **Media Servers**: Plex, Jellyfin, Emby
+- **Media Managers**: Radarr, Sonarr, Lidarr, Prowlarr, Bazarr
+- **Download Clients**: qBittorrent, Deluge, SABnzbd
+- **Utilities**: Heimdall, Dozzle, WireGuard, Vaultwarden, and more.
 
-**Note** ( critical step | without dockserver will not work )
-
----
-
-After deployment of Traefik & Authelia you have to install [mount](https://dockserver.github.io/dockserver/apps/system/mount.html), then you can install any app.
-
-1. Open the dockserver Interface again 
-2. Type 2 
-3. Type 1
-now you can see all the apps sections.
-
-
+All installed applications are automatically secured behind your domain with SSL certificates and Authelia protection!

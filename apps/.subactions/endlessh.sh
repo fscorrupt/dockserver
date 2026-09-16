@@ -1,103 +1,85 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
-# shellcheck disable=SC2003
-# shellcheck disable=SC2006
-# shellcheck disable=SC2207
-# shellcheck disable=SC2012
-# shellcheck disable=SC2086
-# shellcheck disable=SC2196
-# shellcheck disable=SC2046
-#FUNCTIONS
-random() {
-  local min=$1
-  local max=$2
-  local RAND=`od -t uI -N 4 /dev/urandom | awk '{print $2}'`
-  RAND=$((RAND%((($max-$min)+1))+$min))
-  echo $RAND
+###############################################################
+# DockServer - Endlessh & Host SSH Port Configuration         #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
+
+restart_sshd() {
+    echo "Applying SSH port change..."
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl restart ssh.socket 2>/dev/null || true
+    systemctl restart ssh.service 2>/dev/null || systemctl restart sshd.service 2>/dev/null || true
 }
+
+get_current_port() {
+    local p
+    p=$(grep -P '^[#\s]*Port\s+\d+' /etc/ssh/sshd_config 2>/dev/null | sed -E 's/.*Port\s+([0-9]+).*/\1/' | head -1 || echo "22")
+    echo "${p:-22}"
+}
+
 defaultport() {
-sshport=22
-nowport=$(grep -P '^[#\s]*Port ' /etc/ssh/sshd_config | sed 's/[^0-9]*//g')
-sed -i "/^\(\s\|#\)*Port $nowport/ c\Port $sshport" /etc/ssh/sshd_config
-$(command -v systemctl) restart ssh && clear && ending
+    local sshport=22
+    sed -i -E 's/^[#\s]*Port\s+[0-9]+/Port 22/' /etc/ssh/sshd_config
+    restart_sshd
+    echo "SSH port reset to default 22."
+    sleep 2
 }
+
 randomport() {
-sshport=$(random 1500 3333)
-sed -i "/^\(\s\|#\)*Port / c\Port $sshport" /etc/ssh/sshd_config
-$(command -v systemctl) restart ssh && clear && ending
+    local sshport=$((RANDOM % 1833 + 1500))
+    sed -i -E "s/^[#\s]*Port\s+[0-9]+/Port $sshport/" /etc/ssh/sshd_config
+    restart_sshd
+    echo "SSH port changed to random port: $sshport"
+    sleep 2
 }
-customeport() {
-printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🚀  Custome SSH Port
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    Be careful !! if you lose the SSH Port
-    you dont have any access to ssh
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-read -erp "↪️ Type SSH Port [ENTER]: " newport </dev/tty
-if [[ ${newport} != "" ]];then
-   if [[ ${newport} -le "65500" && ${newport} -gt "22" ]];then
-      sshport=$newport
-      sed -i "/^\(\s\|#\)*Port / c\Port $newport" /etc/ssh/sshd_config
-   else
-      clear && echo " Typed port is greater as 65000 or less then 22" && sleep 10 && customeport
-   fi
-else
-   clear && echo " You need to type a new ssh port" && sleep 10 && customeport
-fi
-$(command -v systemctl) restart ssh && clear && ending
+
+customport() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "    🚀  Custom SSH Port"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    read -erp "Enter custom SSH Port (22-65500): " newport </dev/tty
+    if [[ -n "$newport" && "$newport" =~ ^[0-9]+$ && "$newport" -ge 22 && "$newport" -le 65500 ]]; then
+        sed -i -E "s/^[#\s]*Port\s+[0-9]+/Port $newport/" /etc/ssh/sshd_config
+        restart_sshd
+        echo "SSH port changed to: $newport"
+        sleep 2
+    else
+        echo "Invalid port. Must be a number between 22 and 65500."
+        sleep 2
+    fi
 }
-portchange() {
-Portcheck=$(cat /etc/ssh/sshd_config | grep -qE '#Port' && echo true || echo false)
-if [[ $Portcheck == "true" ]];then sed -i "s/#Port/Port/g" /etc/ssh/sshd_config;fi
-nowport=$(grep -P '^[#\s]*Port ' /etc/ssh/sshd_config | sed 's/[^0-9]*//g')
-printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🚀  Change SSH PORT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    Active SSH PORT : $nowport
+main() {
+    # Ensure Port directive exists in /etc/ssh/sshd_config
+    if ! grep -qE '^[#\s]*Port' /etc/ssh/sshd_config 2>/dev/null; then
+        echo "Port 22" >> /etc/ssh/sshd_config
+    fi
 
-    [ 1 ] Reset to default SSH Port 22
-    [ 2 ] Use Random SSH Port
-    [ 3 ] Custome SSH Port
+    local current_port
+    current_port=$(get_current_port)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-  read -erp '↘️  Type Number | Press [ENTER]: ' port </dev/tty
-  case $port in
-     1) defaultport ;;
-     2) randomport ;;
-     3) customeport ;;
-     *) clear && portchange ;;
-  esac
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "    🚀  DockServer - SSH Port Management"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Current Active SSH Port: $current_port"
+    echo ""
+    echo "  [ 1 ] Reset to default Port 22"
+    echo "  [ 2 ] Generate random SSH Port"
+    echo "  [ 3 ] Specify custom SSH Port"
+    echo "  [ Z ] Keep current and exit"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    read -erp "Select Option: " choice </dev/tty
+
+    case $choice in
+        1) defaultport ;;
+        2) randomport ;;
+        3) customport ;;
+        *) return 0 ;;
+    esac
 }
-ending() {
-nowport=$(grep -P '^[#\s]*Port ' /etc/ssh/sshd_config | sed 's/[^0-9]*//g')
-printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🚀  Changed SSH PORT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    Active SSH PORT : $nowport
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-  read -erp "Confirm Info | PRESS [ENTER]" typed </dev/tty
-}
-portchange
-
-#"G#
+main "$@"

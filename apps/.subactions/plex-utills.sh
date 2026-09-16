@@ -1,49 +1,44 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
+###############################################################
+# DockServer - Plex-Utills Configuration Helper               #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
+
 basefolder="/opt/appdata"
-plex=$(docker ps -a --format={{.Names}} | grep -x 'plex' 1>/dev/null 2>&1 && echo true || echo false)
-if [[ -d "/opt/appdata/plex/" && $plex == "true" ]]; then
-SERVERIP=$(curl -s http://whatismijnip.nl |cut -d " " -f 5)
-token=$(cat "/opt/appdata/plex/database/Library/Application Support/Plex Media Server/Preferences.xml" | sed -e 's;^.* PlexOnlineToken=";;' | sed -e 's;".*$;;' | tail -1)
-source $basefolder/compose/.env
+env_file="$basefolder/compose/.env"
 
-printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-In Plex-Utils
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Navigate to Config Page: https://plex-utills.${DOMAIN}/config
-  
-  Plex Connection
-- Enter Plex Url : http://${SERVERIP}:32400
-- Enter Plex Token : ${token}
-
-  Libraries
-- Enter Library Names ( Must match Plex Library Names )
-
-  Schedules
-- Set Schedules ( These must be Set, even If you disable a script )
-
-  Script Options
-- Set Desired Script Options ( 4K/HDR/3D Posters/Banners )
-
-  
-  Save Configuration and you are good to go. 
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-  read -erp "Confirm Info | PRESS [ENTER]" typed </dev/tty
+if [[ -f "$env_file" ]]; then
+    # shellcheck disable=SC1090
+    source "$env_file"
 fi
-#"
+
+plex_running=$(docker ps -a --format '{{.Names}}' | grep -xq 'plex' && echo true || echo false)
+
+if [[ -d "/opt/appdata/plex/" && "$plex_running" == "true" ]]; then
+    if [[ -z "$SERVERIP" || "$SERVERIP" == "SERVERIP_ID" ]]; then
+        SERVERIP=$(curl -sSL --max-time 5 https://api.ipify.org 2>/dev/null || curl -sSL --max-time 5 https://ifconfig.me 2>/dev/null || echo "127.0.0.1")
+        SERVERIP=$(echo "$SERVERIP" | tr -d '[:space:]')
+    fi
+
+    token=""
+    pref_file="/opt/appdata/plex/database/Library/Application Support/Plex Media Server/Preferences.xml"
+    if [[ -f "$pref_file" ]]; then
+        token=$(grep -Po '(?<=PlexOnlineToken=")[^"]*' "$pref_file" | tail -1 || true)
+    fi
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "    🚀  Plex-Utills Quick Setup Info"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Navigate to Config Page: https://plex-utills.${DOMAIN:-example.com}/config"
+    echo ""
+    echo "  Plex Connection Details:"
+    echo "  • Plex URL:   http://${SERVERIP}:32400"
+    echo "  • Plex Token: ${token:-<Enter your token from Plex Settings>}"
+    echo ""
+    echo "  Save your configuration in the Web UI to activate automated posters/banners."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    read -erp "Press [ENTER] to continue: " _ </dev/tty
+fi

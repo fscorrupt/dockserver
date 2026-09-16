@@ -1,141 +1,121 @@
-![Image of DockServer](/img/container_images/docker-dockserver.png)
+# Proxmox LXC Container Setup
 
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
+This guide explains how to prepare a Proxmox VE LXC container to run DockServer with Docker support, hardware GPU passthrough, and external storage.
 
+---
 
-# LXC Container
+## 📋 Recommended Proxmox LXC Configuration
 
-## How to install DockServer on a Proxmox LXC container
+When creating a new LXC container in the Proxmox web interface:
 
-This guide will take you through how to prepare Proxmox to install DockServer on an LXC.
+### 1. General Settings
+- **Hostname**: Choose a container hostname (e.g. `dockserver`).
+- **Unprivileged Container**: **UNCHECK** this box. A **privileged container** is required for Docker mount propagation (`mount --make-shared`), nested container isolation, and GPU device nodes.
+- **Password**: Set a root password for SSH/console access.
 
-##### **Key Points**
+### 2. Template
+- Choose the **Ubuntu 24.04**, **Ubuntu 22.04**, or **Debian 12** standard template.
 
-- This guide assumes you already have Proxmox installed and working. These instructions arw working on 6.4-6
-- Do not use Debian as the Linux image. Networking is shocking and dies after a day or so due to NIC namespace. This guide was written for Ubuntu 20.04
-- Apparmour must be disabled and deleted. If not, Authelia will fail at the password hashing stage.
-- Your LXC must be a privileged container. Unpriviliged containers do not allow GPU passthrough which is needed for Plex transcoding.
-- If you have local drives that you wish to mount, there are a couple of extra lines required in the xxx.conf file.
-- These are the settings that I have set which I have found work well. Your own millage will vary depending on your setup.
+### 3. Root Disk
+- Allocate at least **20 GB** (50 GB–500 GB recommended to allow ample room for Docker images, application configs, and transcode scratch space).
 
-##### **Guide**
+### 4. CPU & Memory
+- **CPU**: 2 to 6 cores depending on your server CPU and expected transcoding load.
+- **Memory & Swap**: 4096 MB to 8192 MB Memory, with matching Swap.
 
-1. Download Ubuntu template. Recommended version is Ubunto 20.04 Standard.
-1. Create a new LXC container:
-   1. **General** tab:
-      1. Give the container a name in the 'Hostname' field.
-      1. Remove the tick from 'Unprivileged container'.
-      1. Set the password and confirm the password you wish to use for CLI access.
-   1. **Template** tab:
-      1. Choose the Ubuntu template.
-   1. **Root Disk** tab:
-      1. Set the disk size high enough to handle all DockServer apps. Allow room for expansion. I personally have this set to 500Gb.
-   1. **CPU** tab:
-      1. Add the number of cores that you want assigned to the LXC. Remember, you will probably have Plex installed in Docker, along with multiple other apps all demanding processing power. I personally have this set to 6 cores.
-   1. **Memory** tab:
-      1. Set the memory and swap size accordingly. Bear in mind the previous comment regarding number of CPU cores. I personally have this set to 8192MiB for both Memory and Swap.
-   1. **Network** tab:
-      1. Uncheck 'Firewall'.
-      1. 'IPv4' and 'IPv6' - I set these both of these to DHCP and then reserve the MAC address in my routers DHCP server.
-   1. **DNS** tab:
-      1. Leave this tab alone.
-   1. **Confirm** tab - check your settings and select 'Finish'.
+### 5. Network
+- **Firewall**: Uncheck to prevent Proxmox host firewall interference with Docker bridge networks.
+- **IPv4 / IPv6**: Set to DHCP or configure a static IP and gateway.
 
-##### **IMPORTANT NOTE - DO NOT START THE CONTAINER YET!**
+### 6. Container Options & Features (Before Booting)
+Before starting the container for the first time, navigate to the container's **Options** > **Features** tab and enable:
+- [x] **Nesting** (`nesting=1`) — *Required for Docker-in-LXC*
+- [x] **keyctl** (`keyctl=1`) — *Required for modern systemd and Docker authentication*
+- [x] **FUSE** — *Required if using Rclone or cloud storage mounts*
+- [x] **CIFS / NFS** — *Required if mounting network shares directly*
 
-Before starting the container, you need to set the following on the Options, Features tab:
+---
 
-1. Nesting
-1. CIFS
-1. NFS
-1. Fuse
+## ⚡ Mount Propagation (`mount --make-shared /`)
 
-##### **GPU Passthrough**
+Docker containers (especially reverse proxies and mounters) require shared mount propagation on the root filesystem.
 
-Run the steps on the following guide to pass through the GPU (my own system is an Intel GPU so I followed each step exactly without any changes and everything worked):
-https://forums.plex.tv/t/pms-installation-guide-when-using-a-proxmox-5-1-lxc-container/219728
-
-NOTE: the above steps worked for Proxmox 6 however with changes to cgroup to cgroup2, the lxc conf file stated:
+DockServer handles this automatically! During pre-installation (`dockserver -i`), DockServer detects if it is running inside an LXC environment and automatically installs a systemd unit:
 ```
-lxc.cgroup.devices.allow = c 226:0 rwm
-lxc.cgroup.devices.allow = c 226:128 rwm
-lxc.cgroup.devices.allow = c 29:0 rwm
-lxc.autodev: 1
-lxc.hook.autodev:/var/lib/lxc/100/mount_hook.sh
+/etc/systemd/system/lxc-make-shared.service
 ```
-Changes this to:
-```
-lxc.cgroup2.devices.allow: a
-227 lxc.cap.drop:
-228 lxc.cgroup2.devices.allow: c 226:0 rwm
-229 lxc.cgroup2.devices.allow: c 226:128 rwm
-230 lxc.cgroup2.devices.allow: c 29:0 rwm
-231 lxc.autodev: 1
-232 lxc.hook.autodev: /var/lib/lxc/112/mount_hook.sh
-```
-Be mindful of the last line - change this to your correct container number rather than 112!
+This unit runs `mount --make-shared /` before `docker.service` on every system boot, completely preventing mount race conditions.
 
-##### **Mounting external NFS Drives**
+---
 
-1. In _Datacenter_, _Storage_ add your NFS external drives.
-1. Open a shell from the node.
-1. Replace 120 with the container number:
-   ```sh
-   nano /etc/pve/lxc/120.conf
+## 🎮 GPU Passthrough (Hardware Transcoding for Plex / Jellyfin)
+
+To pass an Intel or AMD GPU from the Proxmox host into the container:
+
+1. On the Proxmox host terminal, inspect the GPU render devices:
+   ```bash
+   ls -la /dev/dri
    ```
-1. Add the following line('s) as appropriate to the drives you wish to gain access to:
-   ```sh
+   Typically:
+   - `/dev/dri/card0` has major:minor numbers `226:0`
+   - `/dev/dri/renderD128` has major:minor numbers `226:128`
+
+2. Edit the container's configuration file on the Proxmox host (replace `100` with your container ID):
+   ```bash
+   nano /etc/pve/lxc/100.conf
+   ```
+
+3. Add the following cgroup2 and autodev rules to the bottom of the file:
+   ```conf
+   lxc.cgroup2.devices.allow: c 226:0 rwm
+   lxc.cgroup2.devices.allow: c 226:128 rwm
+   lxc.cgroup2.devices.allow: c 29:0 rwm
+   lxc.autodev: 1
+   lxc.hook.autodev: sh -c "mkdir -p ${LXC_ROOTFS_MOUNT}/dev/dri && mknod -m 666 ${LXC_ROOTFS_MOUNT}/dev/dri/card0 c 226 0 && mknod -m 666 ${LXC_ROOTFS_MOUNT}/dev/dri/renderD128 c 226 128"
+   ```
+
+4. Reboot the container from the Proxmox host:
+   ```bash
+   pct reboot 100
+   ```
+
+5. Verify GPU access inside the container:
+   ```bash
+   ls -la /dev/dri
+   ```
+   Both `card0` and `renderD128` will be present. When you run DockServer's GPU setup (`dockserver -i` > GPU Setup), all required VA-API drivers and user groups (`video`, `render`) will be configured automatically.
+
+---
+
+## 🗄️ Mounting External Host Disks or NFS / SMB Shares
+
+If your Proxmox host has storage pools or mounted NFS/SMB shares that you want to expose to DockServer containers:
+
+1. Open the container configuration file on the Proxmox host:
+   ```bash
+   nano /etc/pve/lxc/100.conf
+   ```
+
+2. Add mount point lines (`mp0`, `mp1`, etc.) mapping host paths to container paths:
+   ```conf
    mp0: /mnt/pve/Media,mp=/mnt/Media
-   ```
-   ```sh
    mp1: /mnt/pve/Pictures,mp=/mnt/Pictures
-   ```
-   ```sh
    mp2: /mnt/pve/Music,mp=/mnt/Music
    ```
 
-You can now start the container
+3. Save the file and restart the container. The storage will be directly accessible inside the LXC container under `/mnt/Media`, `/mnt/Pictures`, etc.
 
 ---
 
-##### **How to Disable and Delete Apparmour:**
+## 🛡️ AppArmor Handling
 
-Once the container is up and running and you have logged in:
+In some older Proxmox setups, AppArmor may block nested Docker container operations or password hashing in Authelia. If you encounter permission denials inside the LXC container:
 
-1. Stop Apparmour service:
-   ```sh
-   systemctl stop apparmor
-   ```
-1. Disable Apparmor from starting on system boot:
-   ```sh
-   systemctl disable apparmor
-   ```
-1. Remove Apparmor package and dependencies:
-   ```sh
-   apt remove --assume-yes --purge apparmor
-   ```
+```bash
+# Stop and disable AppArmor inside the container
+sudo systemctl stop apparmor
+sudo systemctl disable apparmor
+sudo apt remove --assume-yes --purge apparmor
+```
 
-Now your LXC is ready to continue the install of DockServer
-
----
-
-## Support
-
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
-
-- Join our <a href="https://discord.gg/FYSvu83caM">
-  <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-  </a> for Support
+Your LXC container is now fully prepared to run DockServer!

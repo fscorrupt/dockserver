@@ -1,27 +1,58 @@
-![Image of DockServer](/img/container_images/docker-dockserver.png)
+# Traefik v3 Reverse Proxy
 
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
+DockServer uses **[Traefik v3](https://traefik.io/traefik/)** as its edge reverse proxy and ingress gateway. Traefik automatically manages SSL certificates, routes incoming requests to the appropriate Docker containers, and applies security middleware.
 
+---
 
-# Treafik
+## 🌟 Key Features
 
-- Wiki Coming Soon .....
- 
-## Support
+- **Automated Wildcard SSL Certificates**: Integrates with Cloudflare via Let's Encrypt DNS-01 challenge (`*.yourdomain.com`).
+- **HTTP/3 & QUIC**: High-speed, modern protocol support enabled out-of-the-box.
+- **Cloudflare Real IP Support**: Automatically trusts Cloudflare proxy IPs and extracts visitor IPs via `CF-Connecting-IP`.
+- **Integrated Security Middleware**:
+  - **CrowdSec IPS Bouncer**: Drops threats before reaching your containers.
+  - **Authelia ForwardAuth**: Protects private services behind Single Sign-On and 2FA.
+  - **Rate Limiting & Security Headers**: Shields against abuse and enforces modern web security standards.
+  - **Branded Error Pages**: Graceful handling for HTTP 404, 500, and 502 error codes.
 
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
+---
 
-- Join our [![Discord: https://discord.gg/A7h7bKBCVa](https://img.shields.io/badge/Discord-gray.svg?style=for-the-badge)](https://discord.gg/A7h7bKBCVa) for Support
+## 🌐 Accessing Gateway Dashboards
+
+Once deployed, access your management dashboards in any web browser:
+
+| Dashboard | URL | Authentication |
+| :--- | :--- | :--- |
+| **Traefik Control Panel** | `https://traefik.yourdomain.com` | Protected by Authelia |
+| **Real-time Log Dashboard** | `https://traefik-dashboard.yourdomain.com` | Protected by Authelia |
+| **Authelia SSO Portal** | `https://authelia.yourdomain.com` | Direct Login |
+
+---
+
+## 📁 Traefik File Locations
+
+All Traefik files and certificates live under `/opt/appdata/traefik/`:
+
+- `/opt/appdata/traefik/acme/acme.json`: Your Let's Encrypt wildcard certificates (stored securely with `600` permissions).
+- `/opt/appdata/traefik/logs/access.log`: Real-time JSON access logs analyzed by CrowdSec and the Log Dashboard.
+- `/opt/appdata/traefik/rules/`: Custom dynamic configuration, routers, and middleware chains.
+
+---
+
+## 🔧 Useful Commands
+
+### View Live Traefik Logs
+```bash
+docker logs -f traefik
+```
+
+### Check Generated Certificates
+Verify that wildcard certificates were generated for your domain:
+```bash
+sudo cat /opt/appdata/traefik/acme/acme.json | grep -i "yourdomain.com"
+```
+
+### Restart Traefik
+```bash
+docker compose -f /opt/appdata/compose/docker-compose.yml restart traefik
+```

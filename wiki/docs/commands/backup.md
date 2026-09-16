@@ -1,27 +1,60 @@
-![Image of DockServer](/img/container_images/docker-backup.png)
+# Application Backup Guide
 
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
+DockServer includes automated backup capabilities to safeguard your application configurations, databases, and user settings.
 
+---
 
-# Backup
+## 💾 Daily Automated Backup Script
 
-- Wiki Coming Soon .....
+DockServer includes a built-in backup script located at:
+```
+/opt/dockserver/scripts/backup/backupdate.sh
+```
 
-## Support
+### What It Backs Up
+The script iterates through all running containers and backs up their `/opt/appdata/<app>` directories into compressed archives using `pigz` (parallel gzip):
+```
+/mnt/downloads/appbackups/local/<app_name>.tar.gz
+```
 
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
+For databases and media servers (like Plex, Emby, Radarr, and Sonarr), it temporarily pauses the container to ensure database consistency before creating the archive.
 
-- Join our [![Discord: https://discord.gg/A7h7bKBCVa](https://img.shields.io/badge/Discord-gray.svg?style=for-the-badge)](https://discord.gg/A7h7bKBCVa) for Support
+---
+
+## ⚡ Running a Manual Backup
+
+To trigger a backup immediately from the terminal:
+
+```bash
+sudo bash /opt/dockserver/scripts/backup/backupdate.sh
+```
+
+---
+
+## ⏰ Scheduling Automated Backups (Cron)
+
+To run backups automatically every day at 3:00 AM, add a cron job:
+
+```bash
+sudo crontab -e
+```
+
+Add the following line:
+```cron
+0 3 * * * /bin/bash /opt/dockserver/scripts/backup/backupdate.sh > /var/log/dockserver_backup.log 2>&1
+```
+
+---
+
+## 🔔 Discord Webhook Notifications (Optional)
+
+You can receive a notification in your Discord channel whenever a backup completes:
+1. Open `/opt/dockserver/scripts/backup/backupdate.sh` with a text editor:
+   ```bash
+   sudo nano /opt/dockserver/scripts/backup/backupdate.sh
+   ```
+2. Set your Discord webhook URL on line 13:
+   ```bash
+   WEBHOOK_URL="https://discord.com/api/webhooks/your/webhook/url"
+   ```
+3. Save and exit.

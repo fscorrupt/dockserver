@@ -1,187 +1,113 @@
-![Image of DockServer](/img/container_images/docker-dockserver.png)
+# Authelia Single Sign-On (SSO) & Two-Factor Authentication
 
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
-
-# Authelia
-
-<p align="center">
-   <a href="https://www.authelia.com/">
-      <img src="https://raw.githubusercontent.com/authelia/authelia/master/docs/images/authelia-title.png" alt="Authelia">
-   </a>
-</p>
-
-[![Build](https://img.shields.io/buildkite/d6543d3ece3433f46dbe5fd9fcfaf1f68a6dbc48eb1048bc22/master?logo=buildkite&style=flat-square&color=brightgreen)](https://buildkite.com/authelia/authelia)
-[![Go Report Card](https://goreportcard.com/badge/github.com/authelia/authelia?logo=go&style=flat-square)](https://goreportcard.com/report/github.com/authelia/authelia)
-
-[![Docker Tag](https://img.shields.io/docker/v/authelia/authelia/latest?logo=docker&style=flat-square&color=blue&sort=semver)](https://microbadger.com/images/authelia/authelia)
-[![Docker Size](https://img.shields.io/docker/image-size/authelia/authelia/latest?logo=docker&style=flat-square&color=blue&sort=semver)](https://hub.docker.com/r/authelia/authelia/tags)
-[![GitHub Release](https://img.shields.io/github/release/authelia/authelia.svg?logo=github&style=flat-square&color=blue)](https://github.com/authelia/authelia/releases)
-
-[![AUR source version](https://img.shields.io/aur/version/authelia?logo=arch-linux&label=authelia&style=flat-square&color=blue)](https://aur.archlinux.org/packages/authelia/)
-[![AUR binary version](https://img.shields.io/aur/version/authelia-bin?logo=arch-linux&label=authelia-bin&style=flat-square&color=blue)](https://aur.archlinux.org/packages/authelia-bin/)
-[![AUR development version](https://img.shields.io/aur/version/authelia-git?logo=arch-linux&label=authelia-git&style=flat-square&color=blue)](https://aur.archlinux.org/packages/authelia-git/)
-[![LICENSE](https://img.shields.io/github/license/authelia/authelia?logo=apache&style=flat-square&color=blue)](https://www.apache.org/licenses/LICENSE-2.0)
-
-[![Sponsor](https://img.shields.io/opencollective/all/authelia-sponsors?logo=Open%20Collective&label=financial%20contributors&style=flat-square&color=blue)](https://opencollective.com/authelia-sponsors)
-[![Discord](https://img.shields.io/discord/707844280412012608?label=discord&logo=discord&style=flat-square&color=blue)](https://discord.authelia.com)
-[![Matrix](https://img.shields.io/matrix/authelia:matrix.org?label=matrix&logo=matrix&style=flat-square&color=blue)](https://riot.im/app/#/room/#authelia:matrix.org)
+DockServer uses **[Authelia](https://www.authelia.com/)** as an authentication and authorization server to protect your web applications with Single Sign-On (SSO) and Multi-Factor Authentication (MFA).
 
 ---
 
-Authelia is an open-source authentication and authorization server providing 2-factor authentication and single sign-on (SSO) for your applications via a web portal. It acts as a companion of reverse proxies like nginx, Traefik or HAProxy to let them know whether queries should pass through. Unauthenticated users are redirected to Authelia Sign-in portal instead.
+## 🌟 Key Features
 
-## Features summary
-
-Here is the list of the main available features:
-
-- Several second factor methods:
-  - **[Security Key (U2F)](https://www.authelia.com/docs/features/2fa/security-key)** with [Yubikey].
-  - **[Time-based One-Time password](https://www.authelia.com/docs/features/2fa/one-time-password)**
-    with [Google Authenticator].
-  - **[Mobile Push Notifications](https://www.authelia.com/docs/features/2fa/push-notifications)**
-    with [Duo](https://duo.com/).
-- Password reset with identity verification using email confirmation.
-- Single-factor only authentication method available.
-- Access restriction after too many authentication attempts.
-- Fine-grained access control per subdomain, user, resource and network.
-- Support of basic authentication for endpoints protected by single factor.
-- Beta support for [OpenID Connect](https://www.authelia.com/docs/configuration/identity-providers/oidc.html).
-- Highly available using a remote database and Redis as a highly available KV store.
-- Compatible with Kubernetes [ingress-nginx](https://github.com/kubernetes/ingress-nginx) controller out of the box.
-
-For more details about the features, follow [Features](https://www.authelia.com/docs/features/).
-
-If you want to know more about the roadmap, follow [Roadmap](https://www.authelia.com/docs/roadmap).
+- **Single Sign-On (SSO)**: Log in once at `https://authelia.yourdomain.com` and access all your secured applications seamlessly.
+- **Multiple Two-Factor Authentication (2FA) Methods**:
+  - **Time-based One-Time Password (TOTP)**: Compatible with Google Authenticator, Bitwarden, 1Password, Authy, and Aegis.
+  - **Security Keys (FIDO2 / WebAuthn / U2F)**: Native hardware key support with Yubikey.
+  - **Push Notifications**: Supported via Duo integration.
+- **Fine-Grained Access Control**: Protect sensitive administrative tools with strict Two-Factor authentication while allowing public access to media client APIs (Plex, Jellyfin mobile apps).
+- **Secure Password Hashing**: Passwords stored using industry-standard **Argon2id** cryptography.
+- **OpenID Connect (OIDC)**: Built-in OIDC provider support.
 
 ---
 
-## Installation and Setup
+## 🚀 Initial Login
 
-- Authelia is deployed via the DockServer main menu, option
+During the initial gateway setup (`dockserver -i`), you configured your Authelia **Admin Username** and **Password**.
 
-```sh
-[ 1 ] Dockserver - Traefik + Authelia
-```
-
-Follow the Instructions
-
----
-
-## Two-Factor Authentication (2FA) (Optional)
-
-### Requirements
-
-- Authelia deployed via DockServer menu
-- Authenticator app ([Google Authenticator], [1Password], [Authy], [AndOTP], etc ...)
+1. Navigate to:
+   ```
+   https://authelia.yourdomain.com
+   ```
+2. Log in with your admin credentials.
 
 ---
 
-## 2FA Setup
+## 📱 Setting Up Two-Factor Authentication (2FA / TOTP)
 
-Once Authelia is deployed, open it's configuration file:
+Follow these steps to require an authenticator app code for your domain:
 
-```sh
+### Step 1: Edit Authelia Configuration
+Open the configuration file:
+
+```bash
 sudo nano /opt/appdata/authelia/configuration.yml
 ```
 
-Change the following:
+1. Ensure the `totp` section is configured:
+   ```yaml
+   totp:
+     issuer: authelia
+     period: 30
+     skew: 1
+   ```
 
-```sh
-totp:
-  issuer: authelia
+2. Scroll down to the `access_control` rules section. Change the policy for your domain from `one_factor` to `two_factor`:
+   ```yaml
+   access_control:
+     default_policy: deny
+     rules:
+       - domain: "*.yourdomain.com"
+         policy: two_factor
+   ```
+
+Save and exit (`Ctrl + O`, `Enter`, `Ctrl + X`).
+
+### Step 2: Restart the Container
+```bash
+docker compose -f /opt/appdata/compose/docker-compose.yml restart authelia
 ```
 
-to:
+### Step 3: Register Your Authenticator App
+1. Visit `https://authelia.yourdomain.com` and log in with your username and password.
+2. Click **"Not registered yet? Register device"**.
+3. Since SMTP email is optional, Authelia writes the registration confirmation link directly to the notification file on your server:
+   ```bash
+   cat /opt/appdata/authelia/notification.txt
+   ```
+4. Copy the URL from `notification.txt` and open it in your browser.
+5. Scan the displayed QR code with your authenticator app (Google Authenticator, Bitwarden, Authy, etc.).
+6. Enter the 6-digit code to finalize registration.
 
-```sh
-totp:
-  issuer: authelia
-  period: 30
-  skew: 1
-```
-
-Scroll further and change the following:
-
-```sh
-## one factor login
-- domain: "*.YOURDOMAIN.COM"
-  policy: one_factor
-```
-
-to this:
-
-```sh
-## two factor login
-- domain: "*.YOURDOMAIN.COM"
-  policy: two_factor
-```
-
-Save and exit by typing `CTRL + X`, then `Y`.
-
-Restart the container:
-
-```sh
-sudo docker restart authelia
-```
-
-Now visit https://authelia.YOURDOMAIN.com and login with the username/password.
-You'll be presented with a screen saying you need to register your device for TOTP.
-Click **"Not registered yet?"** and a message will appear on screen saying **"An email has been sent to your address to complete the process"**.
-As we didn't set up SMTP, no email has been sent. However, the link you need to continue the setup can be found here:
-
-```sh
-cat /opt/appdata/authelia/notification.txt
-```
-
-Copy and paste the URL found in this file into your browser, and then scan the QR code with your favourite OTP app ([Google Authenticator], [1Password], [Authy], [AndOTP], etc).
-Follow the setup instructions in your app, and enter the 6-digit OTP in Authelia.
-
-Congrats, you've got 2FA setup with Authelia!
+Two-Factor Authentication is now active and enforced across your subdomains!
 
 ---
 
-## Support
+## 👥 Adding & Managing Users
 
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
+Authelia stores user accounts in `/opt/appdata/authelia/users_database.yml`:
 
-- Join our <a href="https://discord.gg/FYSvu83caM">
-  <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-  </a> for Support
+```bash
+sudo nano /opt/appdata/authelia/users_database.yml
+```
 
----
+### Adding a New User
+To add a user, generate an Argon2id password hash using the Authelia container:
 
-## License
+```bash
+docker run --rm authelia/authelia:latest authelia crypto hash-password "YourSecurePassword"
+```
 
-**Authelia** is **licensed** under the **[Apache 2.0]** license. The terms of the license are detailed
-in [LICENSE](https://github.com/authelia/authelia/blob/master/LICENSE).
+Add the new user entry to `users_database.yml`:
 
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fauthelia%2Fauthelia.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fauthelia%2Fauthelia?ref=badge_large)
+```yaml
+users:
+  johndoe:
+    displayname: "John Doe"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$..."
+    email: "johndoe@example.com"
+    groups:
+      - users
+      - admin
+```
 
-[apache 2.0]: https://www.apache.org/licenses/LICENSE-2.0
-[totp]: https://en.wikipedia.org/wiki/Time-based_One-time_Password_Algorithm
-[security key]: https://www.yubico.com/about/background/fido/
-[yubikey]: https://www.yubico.com/products/yubikey-hardware/yubikey4/
-[auth_request]: https://nginx.org/en/docs/http/ngx_http_auth_request_module.html
-[google authenticator]: https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2&hl=en
-[1password]: https://1password.com/
-[authy]: https://authy.com/
-[andotp]: https://play.google.com/store/apps/details?id=org.shadowice.flocke.andotp
-[config.template.yml]: https://raw.githubusercontent.com/authelia/authelia/master/config.template.yml
-[nginx]: https://www.nginx.com/
-[traefik]: https://traefik.io/
-[haproxy]: https://www.haproxy.org/
-[docker]: https://docker.com/
-[kubernetes]: https://kubernetes.io/
+Save the file and restart Authelia:
+```bash
+docker compose -f /opt/appdata/compose/docker-compose.yml restart authelia
+```

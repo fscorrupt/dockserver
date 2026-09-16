@@ -1,18 +1,25 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
+###############################################################
+# DockServer - Automated Storage Cleanup                      #
+# Cleans temporary downloads and NZBs when disk usage is high #
+###############################################################
+set -e
 
-cleannzb=/mnt/nzb
-cleandownload=/mnt/downloads/nzb
+cleannzb="/mnt/nzb"
+cleandownload="/mnt/downloads/nzb"
 
-df -H | grep -vE '^Filesystem|tmpfs|cdrom|overlay|udev|/dev/md1|/dev/md127|/dev/md2|mergerfs|remote' | awk '{ print $5 " " $1 }' | while read output; do
-  echo $output
-  usep=$(echo $output | awk '{ print $1}' | cut -d'%' -f1)
-  partition=$(echo $output | awk '{ print $2 }')
-  if [ $usep -ge 75 ]; then
-    echo "Running out of space \"$partition ($usep%)\" on $(hostname) as on $(date), cleaning up $cleandownload folders older than 1 hour, cleaning up $cleannzb files older than 7 days" &&
-      $(command -v find) $cleandownload/* -type d -mmin +240 -exec rm -rf {} \; >/dev/null 2>&1 &&
-      $(command -v find) $cleannzb/* -type f -mmin +10080 -exec rm -rf {} \; >/dev/null 2>&1
-  else
-    echo "disk not out of space"
-  fi
+df -H | grep -vE '^Filesystem|tmpfs|cdrom|overlay|udev|/dev/md1|/dev/md127|/dev/md2|mergerfs|remote' | awk '{ print $5 " " $1 }' | while read -r output; do
+    usep=$(echo "$output" | awk '{ print $1}' | cut -d'%' -f1)
+    partition=$(echo "$output" | awk '{ print $2 }')
+
+    if [[ -n "$usep" && "$usep" =~ ^[0-9]+$ && $usep -ge 80 ]]; then
+        echo "High disk usage on $partition (${usep}%). Running automated cleanup..."
+        if [[ -d "$cleandownload" ]]; then
+            find "$cleandownload" -mindepth 1 -type d -mmin +240 -exec rm -rf {} + 2>/dev/null || true
+        fi
+        if [[ -d "$cleannzb" ]]; then
+            find "$cleannzb" -mindepth 1 -type f -mmin +10080 -exec rm -f {} + 2>/dev/null || true
+        fi
+    fi
 done

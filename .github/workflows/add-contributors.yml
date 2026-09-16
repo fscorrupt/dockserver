@@ -10,7 +10,7 @@ jobs:
   addcon:
     name: Add all Contributors to ReadME
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Generate Token
         uses: actions/create-github-app-token@v3
@@ -20,7 +20,7 @@ jobs:
           private-key: "${{ secrets.BOT_APP_PRIVATE_KEY }}"
 
       - name: Check out code
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v7
         with:
           token: "${{ steps.app-token.outputs.token }}"
 

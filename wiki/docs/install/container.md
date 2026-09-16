@@ -1,133 +1,72 @@
-# Container Images
+# Container Architecture & Ecosystem
 
-<p align="center">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a><br />
-    <img src="https://img.shields.io/liberapay/receives/dockserver.svg?logo=liberapay">
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a></br >
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=mit" alt="MIT License">
-    </a><br />
-    <noscript><a href="https://liberapay.com/dockserver/donate"><img alt="Donate using Liberapay" src="https://liberapay.com/assets/widgets/donate.svg"></a></noscript>
-</p>
+DockServer provides a tailored catalog of Docker containers pre-configured for seamless integration, high performance, and minimal resource utilization.
 
 ---
 
-All Dockefiles are automatically generated 
+## 🏗️ Architecture & Base Images
 
-Do not try to change anything live on the repository
+### Lightweight Alpine Linux Bases
+To keep resource usage low on home servers and VPS instances, DockServer container images utilize **Alpine Linux** base images whenever possible.
+Applications using optimized Alpine builds include:
+- `radarr`
+- `sonarr`
+- `lidarr`
+- `readarr`
+- `bazarr`
+- `sabnzbd`
+- `duplicati`
+- And many more in the catalog!
 
-All changes are made from our own CI Pipline ( unpublic ) 
+Alpine bases result in smaller image downloads, faster startup times, reduced RAM usage, and a significantly smaller attack surface.
 
----
+### Upstream Foundation & Compatibility
+DockServer container templates build upon proven container designs established by the open-source community, particularly [LinuxServer.io](https://linuxserver.io) and [k8s-at-home](https://k8s-at-home.com/).
 
-We are out of the dev version.
-
-All Containers can be used without breaking.
-
-You can use all with dockserver
-
-Don't use the images / dockers on other projects
-This should not work for you.
-
---- 
-
-## Before open a feature request/ pull_request or issues
-
-1. We don't accept pull_request for other projects.
-1. We don't accept any changes what breaks dockserver.
-1. We don't give any help for other projects to run this dockers.
-
----
-
-## Notice Alpine Builds
-
-1. radarr
-1. sonarr
-1. sabnzbd
-1. lidarr
-1. readarr
-1. bazarr
-1. duplicati
-1. And many more......
-
-More and more dockers will use **alpine** as base image
-
-
-## What that's all ?!
-
-Nope... we have build our own CI/CD PIPLINE 
-
-It's runs inside of a isolated Container environment 
-
-Specs :
-
-(( SELF HOSTED ))
-
-I9-9900k
-
-64GB RAM
-
-1 DATACENTER NVME 512GB
-
-*( isolated docker based github runner ))
+Each container definition in DockServer is specifically customized with:
+- Standardized UID/GID mapping (`1000:1000`) for host filesystem permission parity.
+- Integrated Traefik v3 reverse proxy labels and middleware routing rules.
+- Pre-configured Authelia ForwardAuth security and mobile/API bypass endpoints.
+- Common network bridge attachments (`traefik_proxy`).
 
 ---
 
-## Some hidden Updates are pushed
+## 🔄 Automated CI/CD & Security Audits
 
-We provide as next some hidden scripts to build
-
-the docker images based of a json / shell file 
-
-(( runs since 4 weeks now )) 
-
-Also we have added a new layer for check of any breaches.
-
-Next what is also added :
-
-one dependencies script to pull the latest versions of every dependencies what is used inside of the docker
-
-## push to public ?!  And show the code ??
-
-No way ..... 
-
-We didn't show them , 
-since I know some other are stealing here,
-
-Without given any credits or respect
-
-
---- 
-
-## Ideas and Code
-
-This repository is heavily based on 
-
-[Linuxserver.io](https://linuxserver.io) images and [k8s-at-home](https://k8s-at-home.com/) idea
-
-All Containers have some additional edits just for dockserver.github.io
-
-Please check before you run it on other systems
+DockServer container images are maintained through an automated continuous integration and delivery (CI/CD) pipeline:
+- **Dependency Tracking**: Upstream application releases and library updates are tracked and built automatically.
+- **Security Audits**: Automated vulnerability scanning checks base images and dependencies for known CVEs.
+- **Reproducible Builds**: All Dockerfiles and configurations are verified in isolated runner environments before being published.
 
 ---
 
-And the best is 
+## 📂 Standard Filesystem Layout
 
-Fuck XOXO SBOX stealing code to get your product up and running is a bitch move
+All containers deployed through DockServer adhere to a uniform host directory structure:
+
+| Host Path | Purpose |
+| :--- | :--- |
+| `/opt/appdata/<app_name>/` | Persistent app data, configuration files, and SQLite databases |
+| `/opt/appdata/compose/apps/<app_name>/` | Persistent `docker-compose.yml` service definitions |
+| `/mnt/downloads/` | Default download target for torrent and Usenet clients |
+| `/mnt/unionfs/` | Unified media mount point (when cloud storage mounts are active) |
 
 ---
 
-SOME fancy stats 
+## 🛠️ Container Operations
 
-![metrics](./github-metrics.svg)
+You can manage all DockServer containers using standard Docker commands:
 
----
+```bash
+# View active containers
+docker ps
 
-Own Builded Containers
+# Stream logs for a container
+docker logs -f <app_name>
 
+# Restart a specific service
+docker restart <app_name>
 
-#JsonSchema#
+# Update gateway containers
+dockserver -u
+```

@@ -1,9 +1,8 @@
 ---
-version: '3.8'
 services:
   traefik:
     container_name: 'traefik'
-    image: 'docker.io/traefik:3'
+    image: 'ghcr.io/traefik/traefik:v3'
     restart: 'unless-stopped'
     command:
       - --global.checkNewVersion=true
@@ -12,12 +11,20 @@ services:
       - --api.insecure=false
       - --api.dashboard=true
       - --serversTransport.insecureSkipVerify=true
+      - --experimental.plugins.crowdsec-bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - --experimental.plugins.crowdsec-bouncer.version=v1.4.1
       - --log=true
       - --log.level=INFO
+      - --log.filePath=/logs/traefik.log
       - --accessLog=true
-      - --accessLog.filePath=/traefik.log
+      - --accessLog.filePath=/logs/access.log
+      - --accessLog.format=json
       - --accessLog.bufferingSize=100
-      - --accessLog.filters.statusCodes=400-499
+      - --accessLog.fields.defaultMode=keep
+      - --accessLog.fields.names.ClientUsername=drop
+      - --accessLog.fields.headers.defaultMode=keep
+      - --accessLog.fields.headers.names.Authorization=drop
+      - --accessLog.fields.headers.names.Cookie=drop
       - --providers.file.directory=/rules
       - --providers.file.watch=true
       - --providers.docker=true
@@ -28,8 +35,6 @@ services:
       - --entrypoints.http.http.redirections.entryPoint.to=https
       - --entrypoints.http.http.redirections.entryPoint.scheme=https
       - --entryPoints.https.address=:443
-      - --entrypoints.https.http.encodedCharacters.allowEncodedSlash=true
-      - --entrypoints.https.http.encodedCharacters.allowEncodedQuestionMark=true
       - --entrypoints.https.http3
       - --entrypoints.https.http3.advertisedPort=443
       - --entrypoints.https.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/12,172.64.0.0/13,131.0.72.0/22
@@ -65,7 +70,7 @@ services:
       - '${APPFOLDER}/traefik/certs:/tmp/certs:rw'
       - '/var/run/docker.sock:/var/run/docker.sock:ro'
       - '${APPFOLDER}/traefik/acme/acme.json:/acme.json:rw'
-      - '${APPFOLDER}/traefik/traefik.log:/traefik.log:rw'
+      - '${APPFOLDER}/traefik/logs:/logs:rw'
     environment:
       - 'PGID=${ID}'
       - 'PUID=${ID}'
@@ -131,8 +136,136 @@ services:
       - 'traefik.http.routers.authelia-rtr.tls=true'
       - 'traefik.http.routers.authelia-rtr.service=authelia-svc'
       - 'traefik.http.services.authelia-svc.loadbalancer.server.port=9091'
-
+  traefik-agent:
+    container_name: 'traefik-log-dashboard-agent'
+    image: 'hhftechnology/traefik-log-dashboard-agent:latest'
+    restart: 'unless-stopped'
+    depends_on:
+      - traefik
+    networks:
+      - ${DOCKERNETWORK}
+    volumes:
+      - '${APPFOLDER}/traefik/logs:/logs:ro'
+      - '${APPFOLDER}/traefik-dashboard/positions:/data:rw'
+    environment:
+      - 'TRAEFIK_LOG_DASHBOARD_ACCESS_PATH=/logs/access.log'
+      - 'TRAEFIK_LOG_DASHBOARD_ERROR_PATH=/logs/traefik.log'
+      - 'TRAEFIK_LOG_DASHBOARD_AUTH_TOKEN=${TRAEFIK_DASHBOARD_AUTH_TOKEN}'
+      - 'TRAEFIK_LOG_DASHBOARD_SYSTEM_MONITORING=true'
+      - 'TRAEFIK_LOG_DASHBOARD_LOG_FORMAT=json'
+      - 'PORT=5000'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/logs/status"]
+      interval: 2m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - 'dockupdater.enable=true'
+  traefik-dashboard:
+    container_name: 'traefik-log-dashboard'
+    image: 'hhftechnology/traefik-log-dashboard:latest'
+    restart: 'unless-stopped'
+    depends_on:
+      traefik-agent:
+        condition: service_healthy
+    networks:
+      - ${DOCKERNETWORK}
+    ports:
+      - '3002:3000'
+    volumes:
+      - '${APPFOLDER}/traefik-dashboard/data:/data:rw'
+    environment:
+      - 'AGENT_1_NAME=Primary'
+      - 'AGENT_1_URL=http://traefik-agent:5000'
+      - 'AGENT_1_TOKEN=${TRAEFIK_DASHBOARD_AUTH_TOKEN}'
+      - 'AGENT_API_URL=http://traefik-agent:5000'
+      - 'AGENT_API_TOKEN=${TRAEFIK_DASHBOARD_AUTH_TOKEN}'
+      - 'AGENT_NAME=Primary'
+      - 'DASHBOARD_AGENTS_ENV_ONLY=true'
+      - 'NODE_ENV=production'
+      - 'PORT=3000'
+      - 'NEXT_PUBLIC_SHOW_DEMO_PAGE=false'
+      - 'DASHBOARD_MAX_LOGS_DISPLAY=1000'
+      - 'GEOIP_LOOKUP_ENABLED=true'
+    labels:
+      - 'dockupdater.enable=true'
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'traefik.http.routers.traefik-dashboard-rtr.entrypoints=https'
+      - 'traefik.http.routers.traefik-dashboard-rtr.rule=Host(`traefik-dashboard.${DOMAIN}`)'
+      - 'traefik.http.routers.traefik-dashboard-rtr.tls=true'
+      - 'traefik.http.routers.traefik-dashboard-rtr.tls.certresolver=dns-cloudflare'
+      - 'traefik.http.routers.traefik-dashboard-rtr.middlewares=chain-authelia@file'
+      - 'traefik.http.routers.traefik-dashboard-rtr.service=traefik-dashboard-svc'
+      - 'traefik.http.services.traefik-dashboard-svc.loadbalancer.server.port=3000'
+  traefik-error-pages:
+    container_name: 'traefik-error-pages'
+    image: 'ghcr.io/tarampampam/error-pages:3'
+    restart: 'unless-stopped'
+    networks:
+      - ${DOCKERNETWORK}
+    environment:
+      - 'PGID=${ID}'
+      - 'PUID=${ID}'
+      - 'TZ=${TZ}'
+      - 'TEMPLATE_NAME=shuffle'
+    labels:
+      - 'dockupdater.enable=true'
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=proxy'
+      - 'traefik.http.routers.traefik-error-pages-rtr.entrypoints=https'
+      - 'traefik.http.routers.traefik-error-pages-rtr.rule=HostRegexp(`.+`)'
+      - 'traefik.http.routers.traefik-error-pages-rtr.priority=10'
+      - 'traefik.http.routers.traefik-error-pages-rtr.tls=true'
+      - 'traefik.http.routers.traefik-error-pages-rtr.middlewares=chain-no-auth@file'
+      - 'traefik.http.routers.traefik-error-pages-rtr.service=traefik-error-pages-svc'
+      - 'traefik.http.middlewares.traefik-error-pages.errors.service=traefik-error-pages-svc'
+      - 'traefik.http.middlewares.traefik-error-pages.errors.status=400,402,404-599'
+      - 'traefik.http.middlewares.traefik-error-pages.errors.query=/{status}.html'
+      - 'traefik.http.services.traefik-error-pages-svc.loadbalancer.server.port=8080'
+  crowdsec:
+    container_name: 'crowdsec'
+    image: 'docker.io/crowdsecurity/crowdsec:latest'
+    restart: 'unless-stopped'
+    environment:
+      - 'PGID=${ID}'
+      - 'PUID=${ID}'
+      - 'TZ=${TZ}'
+      - 'COLLECTIONS=crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/whitelist-good-actors'
+    networks:
+      - ${DOCKERNETWORK}
+    volumes:
+      - '${APPFOLDER}/crowdsec/config:/etc/crowdsec:rw'
+      - '${APPFOLDER}/crowdsec/data:/var/lib/crowdsec/data:rw'
+      - '${APPFOLDER}/traefik/logs:/var/log/traefik:ro'
+    labels:
+      - 'dockupdater.enable=true'
+  crowdsec-blocklist-import:
+    container_name: 'crowdsec-blocklist-import'
+    image: 'ghcr.io/wolffcatskyy/crowdsec-blocklist-import:latest'
+    restart: 'unless-stopped'
+    depends_on:
+      - crowdsec
+    networks:
+      - ${DOCKERNETWORK}
+    environment:
+      - 'TZ=${TZ}'
+      - 'CROWDSEC_LAPI_URL=http://crowdsec:8080'
+      - 'CROWDSEC_LAPI_KEY=${CROWDSEC_BLOCKLIST_BOUNCER_KEY}'
+      - 'CROWDSEC_MACHINE_ID=${CROWDSEC_BLOCKLIST_MACHINE_ID:-blocklist-import}'
+      - 'CROWDSEC_MACHINE_PASSWORD=${CROWDSEC_BLOCKLIST_MACHINE_PASSWORD}'
+      - 'DECISION_DURATION=${CROWDSEC_BLOCKLIST_DURATION:-24h}'
+      - 'INTERVAL=${CROWDSEC_BLOCKLIST_INTERVAL:-14400}'
+      - 'CROWDSEC_HEARTBEAT_INTERVAL=60'
+      - 'ALLOWLIST_GITHUB=true'
+      - 'CONSOLIDATE_ALERTS=true'
+      - 'LOG_LEVEL=INFO'
+      - 'METRICS_ENABLED=false'
+    labels:
+      - 'dockupdater.enable=true'
 networks:
   proxy:
+    name: ${DOCKERNETWORK:-proxy}
     driver: bridge
     external: true

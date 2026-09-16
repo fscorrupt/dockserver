@@ -1,74 +1,85 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-# Copyright (c) 2020, MrDoob
-# All rights reserved.
-source /opt/appdata/compose/.env
+###############################################################
+# DockServer - Vaultwarden / Bitwarden Setup Helper           #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
+
 basefolder="/opt/appdata"
-f2banfilter="/etc/fail2ban/filter.d"
-f2banjail="/etc/fail2ban/jail.d"
-#### Rework ####
-admintoken=$(openssl rand -base64 96)
-wget -q https://raw.githubusercontent.com/dani-garcia/bitwarden_rs/master/.env.template -O /opt/appdata/bitwarden/.env
-chmod 600 /opt/appdata/bitwarden/.env
-touch /opt/appdata/bitwarden/error.log \
-      /etc/fail2ban/filter.d/bitwardenrs.conf \
-      /etc/fail2ban/jail.d/bitwardenrs.local \
-      /etc/fail2ban/filter.d/bitwardenrs-admin.conf \
-      /etc/fail2ban/jail.d/bitwardenrs-admin.local
-#Set BitWarden fail2ban filter conf File
-bitwardenfail2banfilter="$(cat << EOF
+env_file="$basefolder/compose/.env"
+
+if [[ -f "$env_file" ]]; then
+    # shellcheck disable=SC1090
+    source "$env_file"
+fi
+
+mkdir -p "$basefolder/bitwarden"
+
+# Generate admin token and setup .env if not present
+if [[ ! -f "$basefolder/bitwarden/.env" ]]; then
+    admintoken=$(openssl rand -base64 48)
+    cat <<EOF > "$basefolder/bitwarden/.env"
+# Vaultwarden environment configuration
+ADMIN_TOKEN=${admintoken}
+SIGNUPS_ALLOWED=true
+WEBSOCKET_ENABLED=true
+LOG_FILE=/data/error.log
+LOG_LEVEL=info
+EOF
+    chmod 600 "$basefolder/bitwarden/.env"
+    echo "Generated new Vaultwarden admin token."
+fi
+
+touch "$basefolder/bitwarden/error.log"
+chmod 644 "$basefolder/bitwarden/error.log" 2>/dev/null || true
+
+# Fail2ban configuration if fail2ban is present
+if command -v fail2ban-client >/dev/null 2>&1; then
+    mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
+
+    cat << 'EOF' > /etc/fail2ban/filter.d/bitwardenrs.conf
 [INCLUDES]
 before = common.conf
 [Definition]
 failregex = ^.*Username or password is incorrect\. Try again\. IP: <HOST>\. Username:.*$
 ignoreregex =
 EOF
-)"
-echo "${bitwardenfail2banfilter}" > /etc/fail2ban/filter.d/bitwardenrs.conf
-#Set BitWarden fail2ban jail conf File
-bitwardenfail2banjail="$(cat << EOF
+
+    cat << 'EOF' > /etc/fail2ban/jail.d/bitwardenrs.local
 [bitwardenrs]
 enabled = true
 port = 80,443,8081
-filter = bitwarden
-action = iptables-allports[name=bitwarden]
+filter = bitwardenrs
 logpath = /opt/appdata/bitwarden/error.log
 maxretry = 3
 bantime = 14400
 findtime = 14400
 EOF
-)"
-echo "${bitwardenfail2banjail}" > /etc/fail2ban/jail.d/bitwardenrs.local
-#Set BitWarden fail2ban admin filter conf File
-bitwardenfail2banadminfilter="$(cat << EOF
+
+    cat << 'EOF' > /etc/fail2ban/filter.d/bitwardenrs-admin.conf
 [INCLUDES]
 before = common.conf
 [Definition]
 failregex = ^.*Unauthorized Error: Invalid admin token\. IP: <HOST>.*$
 ignoreregex =
 EOF
-)"
-echo "${bitwardenfail2banadminfilter}" > /etc/fail2ban/filter.d/bitwardenrs-admin.conf
-#Set BitWarden fail2ban admin jail conf File
-bitwardenfail2banadminjail="$(cat << EOF
+
+    cat << 'EOF' > /etc/fail2ban/jail.d/bitwardenrs-admin.local
 [bitwardenrs-admin]
 enabled = true
 port = 80,443
-filter = bitwarden-admin
-action = iptables-allports[name=bitwarden]
+filter = bitwardenrs-admin
 logpath = /opt/appdata/bitwarden/error.log
 maxretry = 5
 bantime = 14400
 findtime = 14400
 EOF
-)"
-echo "${bitwardenfail2banadminjail}" > /etc/fail2ban/jail.d/bitwardenrs-admin.local
-systemctl restart-or-reload fail2ban
-#printf >&2 "Please go to admin url: https://${domain}/admin\n\n"
-#printf >&2 "Enter ${admintoken} to gain access, please save this somewhere!!\n\n"
-echo "Press any key to finish install of bitwarden"
-while [ true ] ; do
-      read -t 3 -n 1
-         if [ $? = 0 ];then exit;else echo "waiting for the keypress";fi
-done
-#EOF
+
+    if systemctl is-active --quiet fail2ban; then
+        systemctl reload-or-restart fail2ban 2>/dev/null || true
+    fi
+fi
+
+chown -R 1000:1000 "$basefolder/bitwarden" 2>/dev/null || true
+echo "Vaultwarden configuration completed."

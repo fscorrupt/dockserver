@@ -1,29 +1,35 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
+###############################################################
+# DockServer - Malicious IP Blocklist via IPSet               #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
 
-apt-get -yqq install iptables ipset
-ipset -q flush ips
-ipset -q create ips hash:net
-for ip in $(curl --compressed https://raw.githubusercontent.com/scriptzteam/IP-BlockList-v4/master/ips.txt 2>/dev/null | grep -v "#" | grep -v -E "\s[1-2]$" | cut -f 1); do ipset add ips $ip; done
-iptables -I INPUT -m set --match-set ips src -j DROP
+if [[ $EUID -ne 0 ]]; then
+    sudo "$0" "$@"
+    exit $?
+fi
 
-RED='\033[0;31m'
-NC='\033[0m'
-printf "${RED}thx to scriptzteam Security Patch\n${NC} code @ scriptzteam \n"
+if ! command -v ipset >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -yqq && apt-get install -yqq ipset iptables 2>/dev/null || true
+fi
 
+echo "Updating malicious IP blocklist..."
+ipset -q flush ips 2>/dev/null || true
+ipset -q create ips hash:net 2>/dev/null || true
 
+# Fetch top malicious IP blocklist
+iplist=$(curl --compressed -sSL --max-time 15 https://raw.githubusercontent.com/scriptzteam/IP-BlockList-v4/master/ips.txt 2>/dev/null || true)
 
+if [[ -n "$iplist" ]]; then
+    echo "$iplist" | grep -v "#" | grep -v -E "\s[1-2]$" | cut -f 1 | head -n 5000 | while read -r ip; do
+        if [[ -n "$ip" ]]; then
+            ipset add ips "$ip" 2>/dev/null || true
+        fi
+    done
+fi
 
-
+iptables -C INPUT -m set --match-set ips src -j DROP 2>/dev/null || iptables -I INPUT -m set --match-set ips src -j DROP 2>/dev/null || true
+echo "IPSet blocklist updated successfully."

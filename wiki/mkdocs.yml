@@ -162,20 +162,21 @@ nav:
   - Home: index.md
   - Getting started:
       - Installation: install/install.md
-      - Authelia: install/authelia.md
       - Cloudflare: install/cloudflare.md
-      - cf-companion: install/cf-companion.md
       - Traefik: install/traefik.md
+      - CrowdSec: install/crowdsec.md
+      - Authelia: install/authelia.md
+      - CF-Companion: install/cf-companion.md
   - Special:
-      - Cloudflare Tunnel: tunnel/cf_tunnel.md
-      - LXC-Container: lxc/lxc.md
       - Migration: install/migration.md
+      - LXC-Container: lxc/lxc.md
+      - Cloudflare Tunnel: tunnel/cf_tunnel.md
       - Changelog: install/changelog.md
   - Container:
-      - Container: install/container.md
+      - Overview: install/container.md
       - Changelog: install/container-gitlog.md
   - Commands:
-      - Commands: commands/commands.md
+      - CLI Reference: commands/commands.md
       - Backup: commands/backup.md
       - Restore: commands/restore.md
   - Remotes:

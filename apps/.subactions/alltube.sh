@@ -1,27 +1,20 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#FUNCTIONS
+###############################################################
+# DockServer - AllTube Configuration Helper                    #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
 
 basefolder="/opt/appdata"
-typed=alltube
+typed="alltube"
+config_dir="$basefolder/${typed}"
+mkdir -p "$config_dir"
 
-if [[ ! -f "$basefolder/${typed}/config.json" ]];then
-
-cat <<'EOF' > $basefolder/${typed}/config.json
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
+if [[ ! -f "$config_dir/config.yml" && ! -f "$config_dir/config.json" ]]; then
+    cat <<'EOF' > "$config_dir/config.yml"
 ---
-# Path to your youtube-dl binary
+# Path to your youtube-dl or yt-dlp binary
 youtubedl: vendor/rg3/youtube-dl/youtube_dl/__main__.py
 
 # Path to your python binary
@@ -60,7 +53,8 @@ stream: false
 
 # MP3 bitrate when converting (in kbit/s)
 audioBitrate: 128
-#EOF
 EOF
+    # Symlink config.json to config.yml for backwards compatibility
+    ln -sf "$config_dir/config.yml" "$config_dir/config.json"
+    chown -R 1000:1000 "$config_dir" 2>/dev/null || true
 fi
-

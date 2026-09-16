@@ -1,27 +1,34 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-##################################
-# Copyright (c) 2021,  : MrDoob  #
-# Docker owner         : doob187 #
-# Docker Maintainer    : doob187 #
-# Code owner           : doob187 #
-#     All rights reserved        #
-##################################
-# THIS DOCKER IS UNDER LICENSE   #
-# NO CUSTOMIZING IS ALLOWED      #
-# NO REBRANDING IS ALLOWED       #
-# NO CODE MIRRORING IS ALLOWED   #
-##################################
-# shellcheck disable=SC2086
-# shellcheck disable=SC2006
+###############################################################
+# DockServer - Automated Backup Dispatcher                    #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
 
-$(command -v docker) system prune -af 1>/dev/null 2>&1
-$(command -v docker) pull ghcr.io/dockserver/docker-backup:latest 1>/dev/null 2>&1
-dock=$(docker ps -a --format '{{.Names}}' | grep -v 'trae' | grep -v 'auth' | grep -v 'cf')
-for i in ${dock}; do
-    $(command -v docker) run --rm -v /opt/appdata:/backup/$i -v /mnt:/mnt ghcr.io/dockserver/docker-backup:latest backup $i local
-    $(command -v chown) -cR 1000:1000 /mnt/downloads/appbackups/local/$i.tar.gz 1>/dev/null 2>&1
+DESTINATION="/mnt/downloads/appbackups/local"
+mkdir -p "$DESTINATION"
+
+# Filter out infrastructure services
+dockers=$(docker ps --format '{{.Names}}' | grep -vE '^(traefik.*|authelia|cf-companion|crowdsec.*|dockupdater|dockserver)$' || true)
+
+if [[ -z "$dockers" ]]; then
+    echo "No application containers running to back up."
+    exit 0
+fi
+
+docker pull -q ghcr.io/dockserver/docker-backup:latest || true
+
+for app in ${dockers}; do
+    echo "Backing up ${app}..."
+    docker run --rm \
+        -v /opt/appdata:/backup/"$app" \
+        -v /mnt:/mnt \
+        ghcr.io/dockserver/docker-backup:latest backup "$app" local 2>/dev/null || true
+
+    if [[ -f "$DESTINATION/${app}.tar.gz" ]]; then
+        chown 1000:1000 "$DESTINATION/${app}.tar.gz" 2>/dev/null || true
+    fi
 done
-$(command -v docker) system prune -af 1>/dev/null 2>&1
-exit
-#EOF
+
+echo "DockServer backup completed."

@@ -1,71 +1,160 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
-# shellcheck disable=SC2086
-# shellcheck disable=SC2006
-appstartup() {
-while true;do
-     dockertraefik=$(docker ps -a --format '{{.Names}}' | sed '/^$/d' | grep -E 'traefik')
-     ntdocker=$(docker network ls | grep -E 'proxy')
-  if [[ $ntdocker == "" && $dockertraefik == "" ]]; then
-     unset ntdocker && unset dockertraefik
-     clear && LOCATION=preinstall && selection
-  else
-     unset ntdocker && unset dockertraefik
-     clear && headinterface
-  fi
-done
+###############################################################
+# DockServer - Main Dispatcher Interface                      #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
+
+basefolder="/opt/appdata"
+env_file="$basefolder/compose/.env"
+dockserver="/opt/dockserver"
+
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+BOLD='\033[1m'
+
+sync_env() {
+    if [[ -f "$dockserver/apps/.subactions/envmigrate.sh" ]]; then
+        bash "$dockserver/apps/.subactions/envmigrate.sh"
+    fi
+    if [[ -f "$env_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$env_file"
+    fi
 }
 
 updatebin() {
-file=/opt/dockserver/.installer/dockserver
-store=/bin/dockserver
-store2=/usr/bin/dockserver
-if [[ -f "/bin/dockserver" ]];then
-   $(command -v rm) $store && \
-   $(command -v rsync) $file $store -aqhv
-   $(command -v rsync) $file $store2 -aqhv
-   $(command -v chown) -R 1000:1000 $store $store2
-   $(command -v chmod) -R 755 $store $store2
-fi
+    local file="/opt/dockserver/.installer/dockserver"
+    if [[ -f "$file" ]]; then
+        cp -f "$file" /usr/bin/dockserver 2>/dev/null || true
+        cp -f "$file" /bin/dockserver 2>/dev/null || true
+        chmod +x /usr/bin/dockserver /bin/dockserver 2>/dev/null || true
+    fi
 }
 
-selection() {
-LOCATION=${LOCATION}
-   cd /opt/dockserver/${LOCATION} && $(command -v bash) install.sh
+get_status() {
+    local service="$1"
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qE "^${service}$"; then
+        echo -e "${GREEN}Running${NC}"
+    elif docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qE "^${service}$"; then
+        echo -e "${YELLOW}Stopped${NC}"
+    else
+        echo -e "${RED}Not Installed${NC}"
+    fi
 }
+
+toggle_servermode() {
+    sync_env
+    local current="${SERVER_MODE:-cloud}"
+    local new_mode="cloud"
+    if [[ "$current" == "cloud" ]]; then
+        new_mode="local"
+    fi
+    sed -i "/^SERVER_MODE=/d" "$env_file" 2>/dev/null || true
+    echo "SERVER_MODE=$new_mode" >> "$env_file"
+    sync_env
+    echo -e "${GREEN}Server mode switched to: ${BOLD}${new_mode}${NC}"
+    sleep 1
+}
+
+system_maintenance() {
+    clear
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}    🚀  System & Docker Maintenance                                       ${NC}"
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo "  [ 1 ] Prune Unused Docker Images & Containers"
+    echo "  [ 2 ] Run Disk Space Cleanup (Download caches)"
+    echo "  [ 3 ] View Edge Gateway Logs"
+    echo "  [ Z ] Back"
+    echo ""
+    read -erp "Select Option: " opt </dev/tty
+    case $opt in
+        1)
+            docker system prune -af --volumes || true
+            echo -e "${GREEN}Docker pruned successfully.${NC}"
+            sleep 2
+            ;;
+        2)
+            if [[ -f "$dockserver/scripts/disk_cleanup.sh" ]]; then
+                bash "$dockserver/scripts/disk_cleanup.sh"
+            fi
+            sleep 2
+            ;;
+        3)
+            docker compose -f "$basefolder/compose/docker-compose.yml" logs --tail=100 -f || true
+            ;;
+        *) ;;
+    esac
+}
+
 headinterface() {
+    updatebin
+    while true; do
+        sync_env
+        clear
 
-printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🚀 DockServer
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    
-    [ 1 ] DockServer - Traefik + Authelia
-    [ 2 ] DockServer - Applications
+        local traefik_status
+        traefik_status=$(get_status "traefik")
+        local crowdsec_status
+        crowdsec_status=$(get_status "crowdsec")
+        local authelia_status
+        authelia_status=$(get_status "authelia")
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    [ EXIT or Z ] - Exit
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-  read -erp "↘️  Type Number and Press [ENTER]: " headsection </dev/tty
-  case $headsection in
-    1) clear && LOCATION=traefik && selection ;;
-    2) clear && LOCATION=apps && selection ;;
-    Z|z|exit|EXIT|Exit|close) updatebin && exit ;;
-    *) clear && appstartup ;;
-  esac
+        echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${BOLD}    🚀  DockServer - Unified Orchestration Platform                       ${NC}"
+        echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "  Domain:             ${CYAN}${DOMAIN:-example.com}${NC}"
+        echo -e "  Server Environment: ${YELLOW}${SERVER_MODE:-cloud}${NC}"
+        echo -e "  Traefik Proxy:      $traefik_status"
+        echo -e "  CrowdSec IPS:       $crowdsec_status"
+        echo -e "  Authelia Gateway:   $authelia_status"
+        echo -e "${CYAN}──────────────────────────────────────────────────────────────────────────${NC}"
+        echo -e "  ${BOLD}[ 1 ] Edge Gateway (Traefik v3 + CrowdSec + Authelia)${NC}"
+        echo -e "  ${BOLD}[ 2 ] Applications Catalog (Install / Remove / Backup)${NC}"
+        echo -e "  ${BOLD}[ 3 ] Host Pre-Installation & Security Hardening${NC}"
+        echo -e "  ${BOLD}[ 4 ] Migration Tool (Upgrade from Legacy DockServer)${NC}"
+        echo -e "  ${BOLD}[ 5 ] Toggle Server Mode [Cloud <-> Local]${NC}"
+        echo -e "  ${BOLD}[ 6 ] System & Docker Maintenance${NC}"
+        echo -e "${CYAN}──────────────────────────────────────────────────────────────────────────${NC}"
+        echo -e "  ${BOLD}[ Z / Exit ] - Exit${NC}"
+        echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        read -erp "Select Option and Press [ENTER]: " headsection </dev/tty
+
+        case $headsection in
+            1)
+                cd "$dockserver/traefik" && bash install.sh
+                ;;
+            2)
+                cd "$dockserver/apps" && bash install.sh
+                ;;
+            3)
+                cd "$dockserver/preinstall" && bash install.sh
+                read -erp "Press [ENTER] to continue..." _ </dev/tty
+                ;;
+            4)
+                if [[ -f "$dockserver/scripts/migrate.sh" ]]; then
+                    bash "$dockserver/scripts/migrate.sh"
+                fi
+                read -erp "Press [ENTER] to continue..." _ </dev/tty
+                ;;
+            5)
+                toggle_servermode
+                ;;
+            6)
+                system_maintenance
+                ;;
+            z|Z|exit|EXIT|close)
+                exit 0
+                ;;
+            *) ;;
+        esac
+    done
 }
-appstartup
-#E-o-F#
+
+headinterface

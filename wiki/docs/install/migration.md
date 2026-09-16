@@ -1,208 +1,154 @@
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
+# Migration & Upgrade Guide
 
-# Migration Introduction
+Whether you are upgrading an existing DockServer installation or migrating from another server (or legacy platforms like PGblitz and Cloudbox), DockServer makes the process seamless and safe.
 
-While many of us has enjoyed PGblitz over the years, the project is now scattered. Some simply ghosted the whole community, and the rest of the devs are working on other projects.
-Even though PGblitz still works, **there are numerous upsides in shifting to dockserver:**
+---
 
-- Updated rclone/mount
-- No file limits
-- Sonarr/Radarr can now analyze the media without hitting api bans
-- On-the-fly configuration of HW Transcoding
-- Intelligent uploader that will automatically start pushing your content to the cloud when disk space is getting low
-  ...to name a few...
+## ⚡ 1. Upgrading an Existing DockServer Installation (1-Click Tool)
 
-# Before you start:
+If you have a running legacy DockServer installation (2020–2023), you can upgrade directly to modern **Traefik v3**, **CrowdSec IPS**, and the **Traefik Log Dashboard** with zero data loss.
 
-We strongly recommend restoring your Server on a [VPS](https://www.hetzner.com/cloud "VPS") or something similar before making the final migration. This is to avoid data-loss and to harden your backups for your final dockserver migration. This guide will take you through a migration with Teamdrive deployed on your pg installation. Feel free to experiement with the gdsa builder in the CLI.
+### Automated Migration Command
 
-## Prerequisites:
+Run the migration tool directly from the terminal:
 
-- PGblitz
-- Tdrive/Tcrypt mount deployed
-- CloudCMD deployed (Under Community Apps)
-
-Open CloudCMD, Navigate to:
-
-/appdata/plexguide/.blitzkeys
-
-Download the contents of that folder (rclone.conf and GDSA keys) to your local machine. These files are very important. Handle with care.
-
-On some forks of PG these files are placed under /uploader and /mount.
-
-Now you are ready to backup your PG apps.
-
+```bash
+sudo dockserver -m
 ```
+
+*(Alternatively, run `sudo dockserver -i` and select **`[ 4 ] Migration Tool`**)*
+
+### What the Migration Tool Does Automatically:
+1. **Safety Backup**: Creates a complete timestamped backup of your current configuration in `/opt/appdata/backup_pre_migration_<timestamp>/`.
+2. **Preserves SSL Certificates**: Moves your existing Let's Encrypt certificates (`acme.json`) into `/opt/appdata/traefik/acme/acme.json` with correct security permissions (`chmod 600`).
+3. **Preserves User Databases**: Retains your existing Authelia user database (`users_database.yml` and `db.sqlite3`) intact so all passwords and 2FA tokens remain valid.
+4. **Bootstraps CrowdSec**: Generates bouncer API keys, registers threat feed importers, and injects your server's public IP into `static-whitelist.yaml`.
+5. **Modernizes Docker Compose**: Upgrades from legacy Docker Compose to the native Docker Compose v2 plugin.
+6. **Zero Configuration Loss**: Preserves your `.env` domain, Cloudflare tokens, and all application configurations.
+
+---
+
+## 📦 2. Migrating from External Seedboxes or Legacy Platforms (PGblitz / Cloudbox)
+
+If you are migrating applications and remote storage from PGblitz, Cloudbox, or another seedbox:
+
+### Step 1: Backup App Data on Old Server
+Create an archive of your `/opt/appdata` (or seedbox app directory):
+
+```bash
+sudo tar -czvf /root/appdata_backup.tar.gz -C /opt/appdata .
+```
+
+You can also run DockServer's backup helper script:
+```bash
 sudo wget -qO- https://raw.githubusercontent.com/dockserver/dockserver/master/backup.sh | sudo bash
 ```
+This creates `/appbackups` on your remote drive containing compressed archives of each application.
 
-This will create a folder named /appbackups on the root of your remote drive. When the backup is done, check that these files exist on your remote drive. Also, check them for file sizes to make sure it looks right. Plex can take a long time, be patient.
+Download your `rclone.conf` and Google Drive Service Account keys (GDSA keys) from `/appdata/plexguide/.blitzkeys` (or `/uploader` and `/mount`).
 
-Now, please order a VPS with ubuntu 22 on it and follow the instructions on the [Wiki](https://dockserver.github.io/dockserver/install/install.html). When dockserver is installed on your host, return here and follow instructions
-
-# Mount & Uploader
-
-Open a terminal
-
-Create the folders
-
+### Step 2: Install DockServer on New Host
+Follow the [Installation Guide](install.md) to install DockServer on Ubuntu 22.04/24.04 or Debian 12, then run:
+```bash
+sudo dockserver -i
 ```
-sudo mkdir -p /opt/appdata/system/{rclone,servicekeys}
-```
+Deploy the **Edge Gateway** (`[ 1 ] Edge Gateway`) with your domain and Cloudflare credentials.
 
-```
-sudo chown -cR 1000:1000 /opt/appdata
-```
-
-Install CloudCMD (under addons)
-
-Navigate to
-/opt/appdata/system/rclone
-Upload the rclone.conf from your old server.
-Do not rename this one.
-
-Navigate to
-/opt/appdata/system/servicekeys
-
-Upload the the same rclone.conf to this folder.
-Rename this rclone.conf to rclonegdsa.conf
-
-Navigate to
-/opt/appdata/system/servicekeys/keys
-Upload all service keys (GDSA01,02..)
-Rename all service keys to not containing a 0 so GDSA01 becomes GDSA1 and so forth..
-
-
-Edit your rclone.conf
-
-```sh
-sudo nano /opt/appdata/system/rclone/rclone.conf
+### Step 3: Configure Rclone & Service Account Keys
+Create the required system directories:
+```bash
+sudo mkdir -p /opt/appdata/system/{rclone,servicekeys/keys}
+sudo chown -R 1000:1000 /opt/appdata
 ```
 
-Remove all GDSA lines here, only the remotes(g/tdrive, g/tcrypt) are left in the file - PGUNION has to be deleted as well
-Like this:
-```
-[gdrive]
-client_id = XOXOYOURID
-client_secret = XOXOYOURSECRET
-type = drive
-server_side_across_configs = true
-token = XOXOYOURTOKEN
+1. **Rclone Configuration (`rclone.conf`)**:
+   Place your standard `rclone.conf` into `/opt/appdata/system/rclone/rclone.conf`.
+   Keep only your storage remotes (e.g. `[gdrive]`, `[tdrive]`, `[tcrypt]`). Remove any GDSA or PGUNION remotes:
+   ```ini
+   [gdrive]
+   type = drive
+   client_id = YOUR_CLIENT_ID
+   client_secret = YOUR_CLIENT_SECRET
+   scope = drive
+   token = YOUR_TOKEN
 
-[tdrive]
-client_id = XOXOYOURID
-client_secret = XOXOYOURSECRET
-type = drive
-server_side_across_configs = true
-token = XOXOYOURTOKEN
-team_drive = XXXXXXXXXXXXXXXXXXX
+   [tdrive]
+   type = drive
+   client_id = YOUR_CLIENT_ID
+   client_secret = YOUR_CLIENT_SECRET
+   scope = drive
+   team_drive = YOUR_TEAM_DRIVE_ID
+   token = YOUR_TOKEN
+   ```
 
-[tdrive2]
-client_id = XOXOYOURID
-client_secret = XOXOYOURSECRET
-type = drive
-server_side_across_configs = true
-token = XOXOYOURTOKEN
-team_drive = XXXXXXXXXXXXXXXXXXX
-```
+2. **Service Account Configuration (`rclonegdsa.conf`)**:
+   Copy your `rclone.conf` to `/opt/appdata/system/servicekeys/rclonegdsa.conf`.
+   In this file, keep only the GDSA entries and point `service_account_file` to `/system/servicekeys/keys/`:
+   ```ini
+   [GDSA1]
+   type = drive
+   scope = drive
+   service_account_file = /system/servicekeys/keys/GDSA1
+   team_drive = YOUR_TEAM_DRIVE_ID
 
-CTRX+X press y
+   [GDSA2]
+   type = drive
+   scope = drive
+   service_account_file = /system/servicekeys/keys/GDSA2
+   team_drive = YOUR_TEAM_DRIVE_ID
+   ```
 
-Edit rclonegdsa.conf
+3. **Upload Keys**:
+   Upload all service account key files into `/opt/appdata/system/servicekeys/keys/`.
+   Ensure keys are named without leading zeros (e.g. `GDSA1`, `GDSA2`, etc.).
 
-```
-sudo nano /opt/appdata/system/servicekeys/rclonegdsa.conf
-```
+4. **Deploy Mount & Uploader**:
+   In `dockserver -i`, navigate to the **System** section and deploy `mount` and `uploader`.
 
-Remove all the remotes (g/tdrive, g/tcrypt) - PGUNION has to be deleted as well.
-You'll also want to make sure to update the `service_account_file` line. Remove the previous path and change it to `/system/servicekeys/keys/` like below.
-Again, remove all zeroes so that the values will be displayed like this:
+### Step 4: Restore Application Data
+Extract your app backup archives into `/opt/appdata/<app_name>`:
+```bash
+sudo tar -xzvf /root/appdata_backup.tar.gz -C /opt/appdata/
+sudo chown -R 1000:1000 /opt/appdata/
+```
+Deploy the corresponding applications via `dockserver -i` > **`[ 2 ] Applications Catalog`**.
 
-```
-[GDSA1]
-type = drive
-scope = drive
-service_account_file = /system/servicekeys/keys/GDSA1
-team_drive = XXXXXXXXXXXXXXXXXXX
+---
 
-[GDSA2]
-type = drive
-scope = drive
-service_account_file = /system/servicekeys/keys/GDSA2
-team_drive = XXXXXXXXXXXXXXXXXXX
-```
+## 🔧 Google Drive Token Refresh & Troubleshooting
 
-CTRL+X y
+If a Google token expires after a migration or reboot:
 
-Done.
+1. **Check Mount Logs**:
+   ```bash
+   sudo tail -n 50 -f /opt/appdata/system/mount/logs/rclone-union.log
+   ```
 
-Now you can deploy mount & uploader under in the system section in the CLI
+2. **Verify Mount Content**:
+   ```bash
+   sudo docker exec mount ls -1p /mnt/unionfs
+   ```
 
-After this you are ready to restore your PG apps on a brand new Dockserver installation
-
-## Note:
-Google Token Expire
-
-it may possible that your Google token expires after a server reboot/migration or other things
-
-logs can be checked with this:
-```
-sudo tail -n 50 -f /opt/appdata/system/mount/logs/rclone-union.log
-```
-And you can also check if remotes are displaying something:
-```
-sudo docker exec mount ls -1p /mnt/unionfs
-```
-if you see something like: 
-Token Expired or could not authenticate with google
-
-then this is your solution (only do a token refresh):
-```
-sudo docker stop mount
-sudo fusermount -uzq /mnt/unionfs 
-sudo fusermount -uzq /mnt/remotes
-```
-```
-cd /opt/appdata/system/rclone
-```
-You can install rclone using the following command:
-```
-sudo apt install curl jq && sudo curl https://rclone.org/install.sh | sudo bash
-```
-After installing Rclone, verify the Rclone version with the following command:
-```
-sudo rclone --version
-```
-Then reconnect:
-```
-rclone config reconnect tdrive: --config=rclone.conf
-
-rclone config reconnect gdrive: --config=rclone.conf
-```
-Then start mount again:
-```
-sudo fusermount -uzq /mnt/unionfs
-sudo docker start mount
-sudo docker logs -f mount
-( or use dozzle for the logs reading )
-```
-
-
-## Support
-
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
-
-- Join our <a href="https://discord.gg/FYSvu83caM">
+3. **Refresh Google OAuth Token**:
+   If you see `Token Expired` or authentication errors:
+   ```bash
+   sudo docker stop mount
+   sudo fusermount -uzq /mnt/unionfs
+   sudo fusermount -uzq /mnt/remotes
+   ```
+   Install Rclone on the host if not present:
+   ```bash
+   sudo curl https://rclone.org/install.sh | sudo bash
+   ```
+   Reconnect the remote using your config:
+   ```bash
+   cd /opt/appdata/system/rclone
+   rclone config reconnect tdrive: --config=rclone.conf
+   rclone config reconnect gdrive: --config=rclone.conf
+   ```
+   Restart mount:
+   ```bash
+   sudo fusermount -uzq /mnt/unionfs
+   sudo docker start mount
+   sudo docker logs -f mount
+   ```

@@ -1,25 +1,45 @@
-![Image of DockServer](/img/container_images/docker-dockserver.png)
+# Applications Catalog
 
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
+DockServer includes a pre-configured catalog of over 80+ self-hosted applications across media, downloads, automation, and system utilities.
 
+---
 
-## Support
+## ⚡ How to Install Applications
 
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
+You can install any application in two simple ways:
 
-- Join our <a href="https://discord.gg/FYSvu83caM">
-  <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-  </a> for Support
+### 1. Interactive Menu
+Run `sudo dockserver -i` and choose **`[ 2 ] Applications Catalog`**. Select an application category and choose the app you want to install.
+
+### 2. Fast Direct Command
+Install any application directly by name:
+```bash
+sudo dockserver -a plex
+sudo dockserver -a radarr
+sudo dockserver -a sonarr
+sudo dockserver -a qbittorrent
+sudo dockserver -a jellyfin
+```
+
+---
+
+## 📂 Application Categories
+
+| Category | Popular Applications |
+| :--- | :--- |
+| **Media Servers** | Plex, Jellyfin, Emby |
+| **Media Managers** | Radarr, Sonarr, Lidarr, Readarr, Bazarr, Prowlarr, Tautulli |
+| **Download Clients** | qBittorrent, Deluge, SABnzbd, NZBGet, JDownloader2 |
+| **Encoders** | HandBrake, Tdarr |
+| **Self-Hosted Utilities** | Bitwarden/Vaultwarden, Home Assistant, Nextcloud, WireGuard, Pi-hole |
+| **Dashboards & Monitoring** | Traefik Log Dashboard, Dozzle, Heimdall, Netdata |
+
+---
+
+## 🔒 Automatic SSL & Authentication
+
+Every application installed through DockServer is automatically:
+- Connected to the internal Docker network (`traefik_proxy`).
+- Assigned an automated Cloudflare CNAME record (`app.yourdomain.com`).
+- Issued an automated Let's Encrypt SSL certificate.
+- Protected behind Authelia Single Sign-On (with public bypass for mobile apps like Plex/Jellyfin and API webhook endpoints).

@@ -1,27 +1,52 @@
-![Image of DockServer](/img/container_images/docker-dockserver.png)
+# Maintenance & Utility Scripts
 
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
+DockServer includes several utility and maintenance scripts located under `/opt/dockserver/scripts/` to help you manage and optimize your server.
 
+---
 
-# DS - Scripts
+## 🧹 Disk & Docker Cleanup
 
-- Wiki Coming Soon .....
+### Docker Image & Cache Prune
+Removes dangling images, stopped containers, and unused builder caches:
+```bash
+sudo bash /opt/dockserver/scripts/docker/dockerprune.sh
+```
 
-## Support
+### System Disk Cleanup
+Cleans APT package caches, rotated systemd logs, and temporary files:
+```bash
+sudo bash /opt/dockserver/scripts/disk_cleanup.sh
+```
 
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
+---
 
-- Join our [![Discord: https://discord.gg/A7h7bKBCVa](https://img.shields.io/badge/Discord-gray.svg?style=for-the-badge)](https://discord.gg/A7h7bKBCVa) for Support
+## 🎬 Plex Optimization Scripts
+
+### Empty Trash Across Libraries
+Removes unavailable items from Plex media libraries via Plex SQLite or API:
+```bash
+sudo bash /opt/dockserver/scripts/plex/plex-empty-trash.sh
+```
+
+### Optimize Plex SQLite Database
+Performs a `VACUUM` and re-indexing on Plex's SQLite database to maintain peak performance:
+```bash
+sudo bash /opt/dockserver/scripts/plex/plex-optimize-db.sh
+```
+
+---
+
+## 💾 Application Backups
+
+### Automated Daily App Backups
+Backs up running containers to `/mnt/downloads/appbackups/local/`:
+```bash
+sudo bash /opt/dockserver/scripts/backup/backupdate.sh
+```
+*(See the [Backup Guide](../commands/backup.md) for automated cron scheduling)*
+
+---
+
+## 🔒 Security & IP Ban Utilities
+
+The `/opt/dockserver/scripts/security/` directory contains helper scripts for inspecting and blocking suspicious IP addresses. Note that CrowdSec now manages bans automatically at the Traefik reverse proxy level.

@@ -1,27 +1,68 @@
-![Image of DockServer](/img/container_images/docker-dockserver.png)
+# DockServer CLI Reference
 
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
+DockServer includes a unified command-line utility accessible via `dockserver` or `sudo dockserver`.
 
+---
 
-# Commands
+## ⚡ Quick Reference
 
-- Wiki Coming Soon .....
+| Command | Description |
+| :--- | :--- |
+| **`sudo dockserver -i`** | Open the interactive menu (Control Center) |
+| **`sudo dockserver -a <app>`** | Fast-install an application (e.g. `dockserver -a plex`) |
+| **`sudo dockserver -u`** | Pull and update edge gateway containers |
+| **`sudo dockserver -m`** | 1-Click upgrade tool for existing legacy installations |
+| **`sudo dockserver --mode <mode>`** | Switch server environment mode (`cloud` or `local`) |
+| **`dockserver -h`** | Display CLI help and command options |
 
-## Support
+---
 
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
+## 📖 Command Details
 
-- Join our [![Discord: https://discord.gg/A7h7bKBCVa](https://img.shields.io/badge/Discord-gray.svg?style=for-the-badge)](https://discord.gg/A7h7bKBCVa) for Support
+### Interactive Control Center
+```bash
+sudo dockserver -i
+```
+Launches the full interactive terminal menu (TUI). From here you can:
+- Configure and deploy Traefik v3, CrowdSec, and Authelia.
+- Browse and install apps from the 80+ application catalog.
+- Run host pre-installations and GPU driver setups.
+- Toggle between Cloud and Local server modes.
+
+---
+
+### Direct Application Installation
+```bash
+sudo dockserver -a <app_name>
+```
+Installs an application directly without opening the interactive menu:
+```bash
+sudo dockserver -a plex
+sudo dockserver -a radarr
+sudo dockserver -a qbittorrent
+```
+
+---
+
+### Update Gateway Containers
+```bash
+sudo dockserver -u
+```
+Pulls the latest images for Traefik, CrowdSec, Authelia, and Cloudflare Companion, and recreates the containers cleanly.
+
+---
+
+### 1-Click Upgrade & Migration
+```bash
+sudo dockserver -m
+```
+Upgrades an existing legacy DockServer setup to modern Traefik v3, CrowdSec IPS, and the Traefik Log Dashboard while preserving existing certificates, passwords, and `.env` settings.
+
+---
+
+### Configure Server Environment Mode
+```bash
+sudo dockserver --mode <cloud|local>
+```
+- **`cloud`**: For cloud VPS or dedicated servers (Hetzner, Vultr, etc.) utilizing remote storage mounts.
+- **`local`**: For bare-metal home servers and LANs. Prevents overriding local router DNS and skips cloud mounters.

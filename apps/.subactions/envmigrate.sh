@@ -4,10 +4,13 @@
 # All rights reserved.
 migrateenv() {
     basefolder="/opt/appdata"
+    mkdir -p "$basefolder/compose"
     #bypass the dark them bug
-    sed -i "s/organizr-dark/organizr/g" $basefolder/compose/.env
-
-    source $basefolder/compose/.env
+    if [[ -f "$basefolder/compose/.env" ]]; then
+        sed -i "s/organizr-dark/organizr/g" "$basefolder/compose/.env" 2>/dev/null || true
+        # shellcheck disable=SC1090
+        source "$basefolder/compose/.env"
+    fi
     echo -e "##Environment for Docker-Compose
 
 ## TRAEFIK
@@ -17,6 +20,20 @@ DOMAIN1_ZONE_ID=${DOMAIN1_ZONE_ID:-CF-ZONE_ID}
 DOMAIN=${DOMAIN:-example.com}
 CLOUDFLARED_UUID=${CLOUDFLARED_UUID:-TUNNEL_UUID_HERE}
 TEMPLATE_NAME=${TEMPLATE_NAME:-connection}
+
+## SERVER ENVIRONMENT (cloud or local)
+SERVER_MODE=${SERVER_MODE:-cloud}
+
+## CROWDSEC & SECURITY
+CROWDSEC_BOUNCER_KEY=${CROWDSEC_BOUNCER_KEY:-}
+CROWDSEC_BLOCKLIST_BOUNCER_KEY=${CROWDSEC_BLOCKLIST_BOUNCER_KEY:-}
+CROWDSEC_BLOCKLIST_MACHINE_ID=${CROWDSEC_BLOCKLIST_MACHINE_ID:-blocklist-import}
+CROWDSEC_BLOCKLIST_MACHINE_PASSWORD=${CROWDSEC_BLOCKLIST_MACHINE_PASSWORD:-}
+CROWDSEC_BLOCKLIST_INTERVAL=${CROWDSEC_BLOCKLIST_INTERVAL:-14400}
+CROWDSEC_BLOCKLIST_DURATION=${CROWDSEC_BLOCKLIST_DURATION:-24h}
+
+## TRAEFIK DASHBOARD & LOGS
+TRAEFIK_DASHBOARD_AUTH_TOKEN=${TRAEFIK_DASHBOARD_AUTH_TOKEN:-}
 
 ## APPPART
 TZ=${TZ}
@@ -197,7 +214,7 @@ WGADMIN_USERNAME=${WGADMIN_USERNAME:-admin}
 WGADMIN_PASSWORD=${WGADMIN_PASSWORD:-admin}
 
 ## Wordpress
-WORDPRESS_MARIADB_PASSWORD=${WORDPRESS_MARIADB_ROOT_PASSWORD:-wordpressrootpw}
+WORDPRESS_MARIADB_ROOT_PASSWORD=${WORDPRESS_MARIADB_ROOT_PASSWORD:-wordpressrootpw}
 WORDPRESS_MARIADB_PASSWORD=${WORDPRESS_MARIADB_PASSWORD:-wordpresspw}
 WORDPRESS_MARIADB_USER=${WORDPRESS_MARIADB_USER:-wordpress}
 WORDPRESS_MARIADB_DATABASE=${WORDPRESS_MARIADB_DATABASE:-wordpress_db}

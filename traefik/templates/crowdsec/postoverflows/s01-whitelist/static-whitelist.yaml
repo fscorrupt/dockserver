@@ -1,0 +1,12 @@
+name: local/static-whitelist
+description: "Whitelist trusted static IP addresses, server external IP, and private subnets"
+whitelist:
+  reason: "Trusted static IP, server public IP, and local networks"
+  ip:
+    - "127.0.0.1"
+    - "::1"
+    - "SERVER_IP_PLACEHOLDER"
+  cidr:
+    - "192.168.0.0/16"
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"

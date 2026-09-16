@@ -1,27 +1,34 @@
-![Image of DockServer](/img/container_images/docker-cf-companion.png)
+# Cloudflare Companion (CF-Companion)
 
-<p align="left">
-    <a href="https://discord.gg/FYSvu83caM">
-        <img src="https://discord.com/api/guilds/830478558995415100/widget.png?label=Discord%20Server&logo=discord" alt="Join DockServer on Discord">
-    </a>
-        <a href="https://github.com/dockserver/dockserver/releases">
-        <img src="https://img.shields.io/github/downloads/dockserver/dockserver/total?label=Total%20Downloads&logo=github" alt="Total Releases Downloaded from GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/releases/latest">
-        <img src="https://img.shields.io/github/v/release/dockserver/dockserver?include_prereleases&label=Latest%20Release&logo=github" alt="Latest Official Release on GitHub">
-    </a>
-    <a href="https://github.com/dockserver/dockserver/blob/master/LICENSE">
-        <img src="https://img.shields.io/github/license/dockserver/dockserver?label=License&logo=gnu" alt="GNU General Public License">
-    </a>
-</p>
+[Cloudflare Companion](https://github.com/tiredofit/docker-traefik-cloudflare-companion) is an automated DNS helper running alongside Traefik in DockServer.
 
+---
 
-# CF-Companion
+## What Does It Do?
 
-- Wiki Coming Soon .....
+Whenever you deploy a new container in DockServer (such as Radarr, Sonarr, or Jellyfin), CF-Companion detects Traefik's host labels and **automatically creates a DNS CNAME record** in your Cloudflare account.
 
-## Support
+- **Zero Manual DNS Management**: You never need to manually add DNS records for individual subdomains in Cloudflare.
+- **Instant Routing**: As soon as an app finishes deploying, `radarr.yourdomain.com`, `sonarr.yourdomain.com`, etc., resolve instantly.
+- **Automatic Cleanup**: If a container is removed, CF-Companion automatically cleans up the stale DNS record.
 
-Kindly report any issues/broken-parts/bugs on [github](https://github.com/dockserver/dockserver/issues) or [discord](https://discord.gg/A7h7bKBCVa)
+---
 
-- Join our [![Discord: https://discord.gg/A7h7bKBCVa](https://img.shields.io/badge/Discord-gray.svg?style=for-the-badge)](https://discord.gg/A7h7bKBCVa) for Support
+## How It Works
+
+1. You install an application in DockServer (via `dockserver -i` or `dockserver -a <app>`).
+2. The application's `docker-compose.yml` includes Traefik router rules (e.g. `Host(\`radarr.${DOMAIN}\`)`).
+3. CF-Companion detects this rule through Docker's event stream.
+4. It calls Cloudflare's API and creates a CNAME pointing `radarr.yourdomain.com` to your root domain `yourdomain.com`.
+
+---
+
+## Verification
+
+To check if CF-Companion is running and actively managing your records:
+
+```bash
+docker logs -f cf-companion
+```
+
+You will see logs detailing any detected containers and newly registered Cloudflare CNAME records.

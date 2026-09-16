@@ -1,144 +1,183 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
-# shellcheck disable=SC2003
-# shellcheck disable=SC2006
-# shellcheck disable=SC2207
-# shellcheck disable=SC2012
-# shellcheck disable=SC2086
-# shellcheck disable=SC2196
-# shellcheck disable=SC2046
-#FUNCTIONS
+###############################################################
+# DockServer - Host Pre-Install & Optimization                #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
 
-updatesystem() {
-   while true; do
-      # shellcheck disable=SC2046
-      printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🚀 DockServer PRE-Install Runs
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-      basefolder="/opt/appdata"
-      source="/opt/dockserver/preinstall/templates/local"
-      oldsinstall && proxydel
-      package_list="update upgrade dist-upgrade autoremove autoclean"
-      for i in ${package_list}; do
-         echo "running now $i" && apt $i -yqq 1>/dev/null 2>&1
-      done
-      folder="/mnt"
-      for fo in ${folder}; do
-         mkdir -p $fo/{unionfs,downloads,incomplete,torrent,nzb} \
-         $fo/{incomplete,downloads}/{nzb,torrent}/{complete,temp,movies,tv,tv4k,movies4k,movieshdr,tvhdr,remux} \
-         $fo/downloads/torrent/{temp,complete}/{movies,tv,tv4k,movies4k,movieshdr,tvhdr,remux} \
-         $fo/{torrent,nzb}/watch
-         find $fo -exec $(command -v chmod) a=rx,u+w {} \;
-         find $fo -exec $(command -v chown) -hR 1000:1000 {} \;
-      done
-      appfolder="/opt/appdata"
-      for app in ${appfolder}; do
-        mkdir -p $app/{compose,system}
-        find $app -exec $(command -v chmod) a=rx,u+w {} \;
-        find $app -exec $(command -v chown) -hR 1000:1000 {} \;
-      done
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+BOLD='\033[1m'
 
-      #### CHANGE DNS SERVERS ####
-      mapfile -t "FILE" < <($(which find) "/etc/netplan" -type f -name "*.yaml")
-      for NETYAML in "${FILE[@]}"; do
-         $(which sed) -i 's/185.12.64.1/9.9.9.9/' ${NETYAML} &>/dev/null
-         $(which sed) -i 's/185.12.64.2/149.112.112.112/' ${NETYAML} &>/dev/null
-         $(which sed) -i 's/2a01:4ff:ff00::add:2/2620:fe::fe/' ${NETYAML} &>/dev/null
-         $(which sed) -i 's/2a01:4ff:ff00::add:1/2620:fe::9/' ${NETYAML} &>/dev/null
-      done
-      netplan apply
+basefolder="/opt/appdata"
+template_dir="/opt/dockserver/preinstall/templates/local"
+env_file="$basefolder/compose/.env"
 
-     if test -f /etc/sysctl.d/99-sysctl.conf; then
-         config="/etc/sysctl.d/99-sysctl.conf"
-         ipv6=$(cat $config | grep -qE 'ipv6' && echo true || false)
-           if [ $ipv6 != 'true' ] || [ $ipv6 == 'true' ]; then
-              grep -qE 'net.ipv6.conf.all.disable_ipv6 = 1' $config || \
-              echo 'net.ipv6.conf.all.disable_ipv6 = 1' >>$config
-              grep -qE 'net.ipv6.conf.default.disable_ipv6 = 1' $config || \
-              echo 'net.ipv6.conf.default.disable_ipv6 = 1' >>$config
-              grep -qE 'net.ipv6.conf.lo.disable_ipv6 = 1' $config || \
-              echo 'net.ipv6.conf.lo.disable_ipv6 = 1' >>$config
-              grep -qE 'net.core.default_qdisc=fq' $config || \
-              echo 'net.core.default_qdisc=fq' >>$config
-              grep -qE 'net.ipv4.tcp_congestion_control=bbr' $config || \
-              echo 'net.ipv4.tcp_congestion_control=bbr' >>$config
-              sysctl -p -q
-           fi
-      fi
+if [[ -f "$env_file" ]]; then
+    # shellcheck disable=SC1090
+    source "$env_file"
+fi
+SERVER_MODE="${SERVER_MODE:-cloud}"
 
-      bash -c "$(curl -sL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)"
-      echo debconf apt-fast/maxdownloads string 16 | debconf-set-selections
-      echo debconf apt-fast/dlflag boolean true | debconf-set-selections
-      echo debconf apt-fast/aptmanager string apt | debconf-set-selections
+oldsinstall() {
+    oldsolutions="plexguide cloudbox gooby sudobox sbox pandaura salty"
+    for i in ${oldsolutions}; do
+        folders="/var/ /opt/ /home/ /srv/"
+        for ii in ${folders}; do
+            show=$(find "$ii" -maxdepth 2 -type d -name "$i" -print 2>/dev/null || true)
+            if [[ -n "$show" ]]; then
+                echo -e "${RED}Legacy installation found at $show (${i}).${NC}"
+                echo "Please install on a fresh server or clean previous installations."
+                read -erp "Type 'confirm' to continue anyway, or press Ctrl+C to abort: " input
+                if [[ "$input" != "confirm" ]]; then exit 1; fi
+            fi
+        done
+    done
+}
 
-      package_basic=(software-properties-common rsync language-pack-en-base pciutils lshw nano rsync fuse curl wget tar pigz pv iptables ipset fail2ban)
-      apt install ${package_basic[@]} --reinstall -yqq 1>/dev/null 2>&1 && sleep 1
+proxydel() {
+    delproxy="apache2 nginx"
+    for i in ${delproxy}; do
+        if systemctl is-active --quiet "$i" 2>/dev/null; then
+            systemctl stop "$i" 2>/dev/null || true
+            systemctl disable "$i" 2>/dev/null || true
+            apt-get remove -yqq "$i" 2>/dev/null || true
+            apt-get purge -yqq "$i" 2>/dev/null || true
+        fi
+    done
+}
 
-      if [ -z `command -v docker` ]; then
-         curl --silent -fsSL https://raw.githubusercontent.com/docker/docker-install/master/install.sh | sudo bash >/dev/null 2>&1
-      fi
-         mkdir -p /etc/docker &>/dev/null
-         rsync -aqhv ${source}/daemon.j2 /etc/docker/daemon.json 1>/dev/null 2>&1
-         usermod -aG docker $(whoami)
-         systemctl reload-or-restart docker.service 1>/dev/null 2>&1
-         systemctl enable docker.service >/dev/null 2>&1
-         curl --silent -fsSL https://raw.githubusercontent.com/dockserver/local-persist/master/scripts/install.sh | sudo bash 1>/dev/null 2>&1
-         docker volume create -d local-persist -o mountpoint=/mnt --name=unionfs
-         docker network create --driver=bridge proxy 1>/dev/null 2>&1
-      if [ -z `command -v docker-compose` ]; then
-         curl -L --fail https://raw.githubusercontent.com/linuxserver/docker-docker-compose/master/run.sh -o /usr/local/bin/docker-compose
-         ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
-         chmod +x /usr/local/bin/docker-compose /usr/bin/docker-compose
-      fi
+setup_directories() {
+    echo -e "${BLUE}Creating required media and application directories...${NC}"
+    folder="/mnt"
+    mkdir -p "$folder"/{unionfs,downloads,incomplete,torrent,nzb} \
+             "$folder"/{incomplete,downloads}/{nzb,torrent}/{complete,temp,movies,tv,tv4k,movies4k,movieshdr,tvhdr,remux} \
+             "$folder"/downloads/torrent/{temp,complete}/{movies,tv,tv4k,movies4k,movieshdr,tvhdr,remux} \
+             "$folder"/{torrent,nzb}/watch
 
-      disable=(apt-daily.service apt-daily.timer apt-daily-upgrade.timer apt-daily-upgrade.service)
-      systemctl disable ${disable[@]} >/dev/null 2>&1
-       
-      gpu="ntel NVIDIA"
-      for i in ${gpu}; do
-            TDV=$(lspci | grep -i --color 'vga\|display\|3d\|2d' 1>/dev/null 2>&1 && echo true || echo false)
-            if [[ $TDV == "true" ]]; then $(command -v bash) ${source}/gpu.sh; fi
-      done
+    chmod -R a=rx,u+w "$folder" 2>/dev/null || true
+    chown -hR 1000:1000 "$folder" 2>/dev/null || true
 
-      if [ -z `command -v ansible` ]; then
-         if [[ -r /etc/os-release ]]; then lsb_dist="$(. /etc/os-release && echo "$ID")"; fi
-         package_list="ansible dialog python3-lxml"
-         package_listdebian="apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367"
-         package_listubuntu="apt-add-repository --yes --update ppa:ansible/ansible"
-         if [[ $lsb_dist == 'ubuntu' ]] || [[ $lsb_dist == 'rasbian' ]]; then ${package_listubuntu} 1>/dev/null 2>&1; else ${package_listdebian} 1>/dev/null 2>&1; fi
-         for i in ${package_list}; do
-            $(command -v apt) install $i --reinstall -yqq 1>/dev/null 2>&1
-         done
-         if [[ $lsb_dist == 'ubuntu' ]]; then add-apt-repository --yes --remove ppa:ansible/ansible; fi
-      fi
+    mkdir -p "$basefolder"/{compose,system}
+    chmod -R a=rx,u+w "$basefolder" 2>/dev/null || true
+    chown -hR 1000:1000 "$basefolder" 2>/dev/null || true
+}
 
-      if [[ ! -d "/etc/ansible/inventories" ]]; then
-         $(command -v mkdir) -p $invet 
-      fi
-      cat > /etc/ansible/inventories/local << EOF; $(echo)
-## CUSTOM local inventories
+configure_sysctl() {
+    echo -e "${BLUE}Configuring kernel TCP BBR and buffer limits...${NC}"
+    config="/etc/sysctl.d/99-sysctl.conf"
+    touch "$config"
+
+    # Set TCP BBR and networking performance
+    grep -qE 'net.core.default_qdisc=fq' "$config" || echo 'net.core.default_qdisc=fq' >> "$config"
+    grep -qE 'net.ipv4.tcp_congestion_control=bbr' "$config" || echo 'net.ipv4.tcp_congestion_control=bbr' >> "$config"
+    grep -qE 'fs.file-max' "$config" || echo 'fs.file-max = 2097152' >> "$config"
+
+    sysctl -p "$config" -q 2>/dev/null || true
+}
+
+configure_dns() {
+    # If Local server mode, do not modify Netplan or DNS to preserve internal LAN/mDNS resolution
+    if [[ "$SERVER_MODE" == "local" ]]; then
+        echo -e "${YELLOW}Server mode is LOCAL: Skipping Netplan DNS overrides to preserve local LAN resolution.${NC}"
+        return 0
+    fi
+
+    # Cloud server mode: Safely apply Quad9 DNS if Netplan is present and has Hetzner default IPs
+    if [[ -d "/etc/netplan" ]]; then
+        mapfile -t FILE < <(find /etc/netplan -type f \( -name "*.yaml" -o -name "*.yml" \) 2>/dev/null)
+        for NETYAML in "${FILE[@]}"; do
+            sed -i 's/185.12.64.1/9.9.9.9/' "$NETYAML" 2>/dev/null || true
+            sed -i 's/185.12.64.2/149.112.112.112/' "$NETYAML" 2>/dev/null || true
+        done
+        netplan apply 2>/dev/null || true
+    fi
+}
+
+install_packages() {
+    echo -e "${BLUE}Updating system packages and installing dependencies...${NC}"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -yqq
+
+    local packages=(
+        software-properties-common rsync pciutils lshw nano fuse curl wget
+        tar pigz pv iptables ipset fail2ban jq ca-certificates gnupg python3
+    )
+    apt-get install -yqq "${packages[@]}"
+}
+
+install_docker() {
+    echo -e "${BLUE}Installing Docker Engine & Docker Compose v2...${NC}"
+    if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+        local lsb_dist="ubuntu"
+        if [[ -r /etc/os-release ]]; then
+            lsb_dist="$(. /etc/os-release && echo "$ID")"
+        fi
+
+        install -m 0755 -d /etc/apt/keyrings
+        if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
+            curl -fsSL "https://download.docker.com/linux/${lsb_dist}/gpg" -o /etc/apt/keyrings/docker.asc
+            chmod a+r /etc/apt/keyrings/docker.asc
+        fi
+
+        local codename
+        codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${lsb_dist} ${codename} stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+        apt-get update -yqq
+        apt-get install -yqq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    fi
+
+    # Backwards compatibility symlink for legacy scripts
+    if [[ ! -f /usr/bin/docker-compose ]]; then
+        if [[ -f /usr/libexec/docker/cli-plugins/docker-compose ]]; then
+            ln -sf /usr/libexec/docker/cli-plugins/docker-compose /usr/bin/docker-compose
+        fi
+    fi
+
+    # Configure Docker daemon (preserve existing configuration if present)
+    mkdir -p /etc/docker
+    if [[ ! -f /etc/docker/daemon.json && -f "${template_dir}/daemon.j2" ]]; then
+        cp -f "${template_dir}/daemon.j2" /etc/docker/daemon.json
+        if [[ "$SERVER_MODE" == "local" ]]; then
+            # In local mode, remove hardcoded Quad9 DNS so containers use host LAN DNS
+            sed -i '/"dns":/d' /etc/docker/daemon.json 2>/dev/null || true
+        fi
+    fi
+    systemctl reload-or-restart docker.service 2>/dev/null || true
+    systemctl enable docker.service 2>/dev/null || true
+
+    # Install local-persist plugin for unionfs volume
+    if ! docker volume ls | grep -q 'unionfs'; then
+        curl --silent -fsSL https://raw.githubusercontent.com/dockserver/local-persist/master/scripts/install.sh | bash >/dev/null 2>&1 || true
+        docker volume create -d local-persist -o mountpoint=/mnt --name=unionfs 2>/dev/null || true
+    fi
+
+    # Create proxy network
+    if ! docker network ls | grep -q 'proxy'; then
+        docker network create --driver=bridge proxy 2>/dev/null || true
+    fi
+}
+
+install_ansible() {
+    # Install ansible from standard repositories on Ubuntu 22.04, 24.04 and Debian 12
+    if ! command -v ansible >/dev/null 2>&1; then
+        echo -e "${BLUE}Installing Ansible...${NC}"
+        apt-get install -yqq ansible dialog python3-lxml 2>/dev/null || true
+    fi
+
+    mkdir -p /etc/ansible/inventories
+    cat > /etc/ansible/inventories/local << 'EOF'
 [local]
 127.0.0.1 ansible_connection=local
 EOF
-      if [[ -f /etc/ansible/ansible.cfg ]]; then
-        $(command -v mv) /etc/ansible/ansible.cfg /etc/ansible/ansible.cfg.bak
-      fi
-cat > /etc/ansible/ansible.cfg << EOF; $(echo)
-## CUSTOM Ansible.cfg
+
+    cat > /etc/ansible/ansible.cfg << 'EOF'
 [defaults]
 deprecation_warnings = False
 command_warnings = False
@@ -146,101 +185,84 @@ force_color = True
 inventory = /etc/ansible/inventories/local
 retry_files_enabled = False
 EOF
+}
 
-      if [[ "$(systemd-detect-virt)" == "lxc" ]]; then $(command -v bash) /opt/dockserver/preinstall/installer/subinstall/lxc.sh; fi
+setup_security() {
+    echo -e "${BLUE}Configuring security rules (Fail2ban, limits, ipset)...${NC}"
+    # Security limits
+    sed -i '/hard nofile/ d' /etc/security/limits.conf
+    sed -i '/soft nofile/ d' /etc/security/limits.conf
+    echo -e "* hard nofile 65536\n* soft nofile 32768" >> /etc/security/limits.conf
 
-      while true; do
-         f2ban=$($(command -v systemctl) is-active fail2ban | grep -qE 'active' && echo true || echo false)
-         if [[ $f2ban != 'true' ]]; then echo "Waiting for fail2ban to start" && sleep 1 && continue; else break; fi
-      done
-
-      ORGFILE="/etc/fail2ban/jail.conf"
-      LOCALMOD="/etc/fail2ban/jail.local"
-cat > /etc/fail2ban/filter.d/log4j-jndi.conf << EOF; $(echo)
-# jay@gooby.org
-# https://jay.gooby.org/2021/12/13/a-fail2ban-filter-for-the-log4j-cve-2021-44228
-# https://gist.github.com/jaygooby/3502143639e09bb694e9c0f3c6203949
-# Thanks to https://gist.github.com/kocour for a better regex
+    # Fail2ban filters
+    mkdir -p /etc/fail2ban/filter.d
+    cat > /etc/fail2ban/filter.d/log4j-jndi.conf << 'EOF'
 [log4j-jndi]
 maxretry = 1
 enabled = true
 port = 80,443
-logpath = /opt/appdata/traefik/traefik.log
+logpath = /opt/appdata/traefik/logs/traefik.log
 EOF
 
-cat > /etc/fail2ban/filter.d/authelia.conf << EOF; $(echo)
+    cat > /etc/fail2ban/filter.d/authelia.conf << 'EOF'
 [authelia]
 enabled = true
 port = http,https,9091
 filter = authelia
 logpath = /opt/appdata/authelia/authelia.log
-maxretry = 2
-bantime = 90d
-findtime = 7d
+maxretry = 3
+bantime = 24h
+findtime = 1h
 chain = DOCKER-USER
 EOF
-grep -qE '#log4j
-[Definition]
-failregex   = (?i)^<HOST> .* ".*\$.*(7B|\{).*(lower:)?.*j.*n.*d.*i.*:.*".*?$' /etc/fail2ban/jail.local || \
- echo '#log4j
-[Definition]
-failregex   = (?i)^<HOST> .* ".*\$.*(7B|\{).*(lower:)?.*j.*n.*d.*i.*:.*".*?$' > /etc/fail2ban/jail.local
-         sed -i "s#rotate 4#rotate 1#g" /etc/logrotate.conf
-         sed -i "s#weekly#daily#g" /etc/logrotate.conf
 
-      f2ban=$($(command -v systemctl) is-active fail2ban | grep -qE 'active' && echo true || echo false)
-      if [[ $f2ban != "false" ]]; then
-         $(command -v systemctl) reload-or-restart fail2ban.service 1>/dev/null 2>&1
-         $(command -v systemctl) enable fail2ban.service 1>/dev/null 2>&1
-      fi
+    if systemctl is-active --quiet fail2ban; then
+        systemctl reload-or-restart fail2ban.service 2>/dev/null || true
+    fi
 
-      #bad ips mod
-      ipset -q flush ips
-      ipset -q create ips hash:net
-      for ip in $(curl --compressed https://raw.githubusercontent.com/scriptzteam/IP-BlockList-v4/master/ips.txt 2>/dev/null | grep -v "#" | grep -v -E "\s[1-2]$" | cut -f 1); do ipset add ips $ip; done
-      iptables -I INPUT -m set --match-set ips src -j DROP
-      update-locale LANG=LANG=LC_ALL=en_US.UTF-8 LANGUAGE 1>/dev/null 2>&1
-      localectl set-locale LANG=LC_ALL=en_US.UTF-8 1>/dev/null 2>&1
+    # IPSet malicious bot blocking
+    if command -v ipset >/dev/null 2>&1; then
+        ipset -q flush ips 2>/dev/null || true
+        ipset -q create ips hash:net 2>/dev/null || true
+        for ip in $(curl --compressed -sSL https://raw.githubusercontent.com/scriptzteam/IP-BlockList-v4/master/ips.txt 2>/dev/null | grep -v "#" | grep -v -E "\s[1-2]$" | cut -f 1 | head -n 5000); do
+            ipset add ips "$ip" 2>/dev/null || true
+        done
+        iptables -C INPUT -m set --match-set ips src -j DROP 2>/dev/null || iptables -I INPUT -m set --match-set ips src -j DROP 2>/dev/null || true
+    fi
+}
 
-      ## raiselimits
-      sed -i '/hard nofile/ d' /etc/security/limits.conf
-      sed -i '/soft nofile/ d' /etc/security/limits.conf
-      sed -i '$ i\* hard nofile 32768\n* soft nofile 16384' /etc/security/limits.conf
-      printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🚀 DockServer PRE-Install is done
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-      break
-   done
+main() {
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}    🚀  DockServer Host Pre-Installation & Optimization                   ${NC}"
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    oldsinstall
+    proxydel
+    install_packages
+    setup_directories
+    configure_sysctl
+    configure_dns
+    install_docker
+    install_ansible
+    setup_security
+
+    # LXC environment configuration
+    if [[ "$(systemd-detect-virt 2>/dev/null)" == "lxc" ]]; then
+        if [[ -f "/opt/dockserver/preinstall/installer/subinstall/lxc.sh" ]]; then
+            bash "/opt/dockserver/preinstall/installer/subinstall/lxc.sh" || true
+        fi
+    fi
+
+    # Hardware Acceleration & GPU configuration
+    if [[ -d "/dev/dri" || $(lspci 2>/dev/null | grep -iE 'vga|display|3d|2d' | grep -iE 'nvidia|intel|amd|ati|radeon' || true) ]]; then
+        if [[ -f "${template_dir}/gpu.sh" ]]; then
+            bash "${template_dir}/gpu.sh" || true
+        fi
+    fi
+
+    echo ""
+    echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}${BOLD}    🚀  Pre-Installation Complete! Ready for Edge Gateway setup.         ${NC}"
+    echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
-proxydel() {
-   delproxy="apache2 nginx"
-   for i in ${delproxy}; do
-      $(command -v systemctl) stop $i 1>/dev/null 2>&1
-      $(command -v systemctl) disable $i 1>/dev/null 2>&1
-      $(command -v apt) remove $i -yqq 1>/dev/null 2>&1
-      $(command -v apt) purge $i -yqq 1>/dev/null 2>&1
-      break
-   done
-}
-oldsinstall() {
-   oldsolutions="plexguide cloudbox gooby sudobox sbox pandaura salty"
-   for i in ${oldsolutions}; do
-      folders="/var/ /opt/ /home/ /srv/"
-      for ii in ${folders}; do
-         show=$(find $ii -maxdepth 2 -type d -name $i -print)
-         if [[ $show != '' ]]; then
-            echo ""
-            printf "\033[0;31m You need to reinstall your operating system.
-sorry, you need a freshly installed server. We can not install on top of $i\033[0m\n"
-            echo ""
-            read -erp "Type confirm when you have read the message: " input
-            if [[ "$input" = "confirm" ]]; then exit; else oldsinstall; fi
-         fi
-      done
-   done
-}
-# FUNCTIONS END ##############################################################
-updatesystem
-#E-O-F#
+
+main "$@"

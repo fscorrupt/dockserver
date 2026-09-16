@@ -1,60 +1,41 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
-appstartup() {
-  if [[ $EUID -ne 0 ]]; then
-    printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⛔  You must execute as a SUDO user (with sudo) or as ROOT!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
+###############################################################
+# DockServer - Docker Maintenance & Prune Tool                #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
+
+if [[ $EUID -ne 0 ]]; then
+    sudo "$0" "$@"
+    exit $?
+fi
+
+run_prune() {
+    echo ""
+    echo "Running Docker system prune..."
+    docker system prune -af --volumes
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  ✅  Docker Prune Completed Successfully!"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    sleep 2
     exit 0
-  fi
-  while true; do
-    if [[ ! -x $(command -v docker) ]]; then exit; fi
-    dockerprune
-  done
 }
-run() {
-  $(command -v docker) system prune -af
-  echo ""
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo " ✅ Prune Completed Successfully "
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  sleep 5 && exit
-}
-dockerprune() {
-  printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    🚀  DockServer Host Cleaner
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Would you like to remove all unused containers,
-   networks, volumes, images and build cache?
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "    🚀  DockServer Docker Maintenance Cleaner"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  This will remove:"
+echo "  • All stopped containers"
+echo "  • All unused networks"
+echo "  • All unused/dangling images"
+echo "  • All build cache"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+read -erp "Proceed with prune? (y/N): " choice </dev/tty
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    [ EXIT or Z ] - Exit || [ help or HELP ] - Help
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-
-  read -erp "↘️  Type Y | N and Press [ENTER]: " action </dev/tty
-  case $action in
-  y | Y | YES | yes) clear && run ;;
-  n | N | NO | No) clear && exit ;;
-  Z | z | exit | EXIT | Exit | close) exit ;;
-  *) dockerprune ;;
-  esac
-}
-appstartup
-#EO
+case $choice in
+    y|Y|yes|YES) run_prune ;;
+    *) echo "Prune cancelled." ;;
+esac

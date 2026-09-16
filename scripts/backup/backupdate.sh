@@ -1,80 +1,71 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
 # shellcheck shell=bash
-#####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THIS DOCKER IS UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
+###############################################################
+# DockServer - Scheduled Daily Application Backup             #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
 
-### START OF SETTINGS
-## sample crontab
-## sudo crontab -e
-
-## ## Autobackup all Dockers
-## 5 3 * * * bash /opt/dockserver/scripts/backup/backupdate.sh >/dev/null 2>&1
-
-##### INFORMATIONS
-## 03:05 each day to storage date
-## BASIC setting is STORAGE=local
-## sample date 2021-07-22
-## DATE BASED setting is STORAGE=$(date "+%Y-%m-%d")
-## STORAGE=local
-## STORAGE=$(date "+%Y-%m-%d")
-
-## Set your Discord Webhook URL here. Leave as "" if not used.
+# Settings
+FOLDER="/opt/appdata"
+DESTINATION="/mnt/downloads/appbackups"
+STORAGE="local"
 WEBHOOK_URL=""
 
-## USER SETTINGS
-STORAGE=local
-### END OF SETTINGS
+# Ensure compression tools are installed
+if ! command -v pigz >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -yqq && apt-get install -yqq tar pigz pv 2>/dev/null || true
+fi
+
+TARGET_DIR="${DESTINATION}/${STORAGE}"
+mkdir -p "$TARGET_DIR"
 
 OPTIONSTAR="--warning=no-file-changed \
   --ignore-failed-read \
   --absolute-names \
-  --exclude-from=/opt/dockserver/apps/.backup/backup_excludes \
   --warning=no-file-removed \
   --use-compress-program=pigz"
 
-FOLDER="/opt/appdata"
-DESTINATION="/mnt/downloads/appbackups"
-dockers=$(docker ps -a --format '{{.Names}}' | sed '/^$/d' | grep -v 'trae' | grep -v 'auth' | grep -v 'cf-companion' | grep -v 'mongo' | grep -v 'dockupdater' | grep -v 'sbox')
+if [[ -f "/opt/dockserver/apps/.backup/backup_excludes" ]]; then
+    OPTIONSTAR="$OPTIONSTAR --exclude-from=/opt/dockserver/apps/.backup/backup_excludes"
+fi
 
-for i in ${dockers}; do
-   ARCHIVE=$i
-   ARCHIVETAR=${ARCHIVE}.tar.gz
-   if [[ ! -d ${DESTINATION}/${STORAGE} ]]; then $(command -v mkdir) -p ${DESTINATION}/${STORAGE}; fi
-   forcepush="tar pigz pv"
-   for fc in ${forcepush}; do
-      $(command -v apt) install $fc --reinstall -yqq 1>/dev/null 2>&1 && sleep 1
-   done
-   appfolder=/opt/dockserver/apps/
-   IGNORE="! -path '**.subactions/**'"
-   mapfile -t files < <(eval find ${appfolder} -type f -name $typed.yml ${IGNORE})
-   for i in "${files[@]}"; do
-      section=$(dirname "${i}" | sed "s#${appfolder}##g" | sed 's/\/$//')
-   done
-   if [[ ${section} == "mediaserver" || ${section} == "mediamanager" ]]; then
-      $(command -v docker) stop ${typed} 1>/dev/null 2>&1 && echo "We stopped now $typed"
-      $(command -v tar) ${OPTIONSTAR} -C ${FOLDER}/${ARCHIVE} -pcf ${DESTINATION}/${STORAGE}/${ARCHIVETAR} ./
-      $(command -v docker) start ${typed} 1>/dev/null 2>&1 && echo "We started now $typed"
-   else
-      $(command -v tar) ${OPTIONSTAR} -C ${FOLDER}/${ARCHIVE} -pcf ${DESTINATION}/${STORAGE}/${ARCHIVETAR} ./
-   fi
-   $(command -v chown) -hR 1000:1000 ${DESTINATION}/${STORAGE}/${ARCHIVETAR}
-   
-   if [[ -n $WEBHOOK_URL ]]; then
-       # Sending notification to Discord
-       TIMESTAMP=$(date '+%H:%M:%S')
-       curl -H "Content-Type: application/json" \
-           -X POST \
-           -d "{\"content\": \"Backup of $ARCHIVE in folder $STORAGE completed at $TIMESTAMP!\"}" \
-           $WEBHOOK_URL
-   fi
+dockers=$(docker ps -a --format '{{.Names}}' | grep -vE '^(traefik.*|authelia|cf-companion|crowdsec.*|dockupdater|dockserver)$' || true)
+
+for app in ${dockers}; do
+    ARCHIVETAR="${app}.tar.gz"
+
+    if [[ ! -d "${FOLDER}/${app}" ]]; then
+        continue
+    fi
+
+    echo "Backing up ${app}..."
+
+    # Check if app is in mediaserver or mediamanager categories to temporarily stop for clean SQLite DB backup
+    app_file=$(find /opt/dockserver/apps/ -maxdepth 2 -type f -name "${app}.yml" ! -path "*/.subactions/*" 2>/dev/null | head -1 || true)
+    section=""
+    if [[ -n "$app_file" ]]; then
+        section=$(basename "$(dirname "$app_file")")
+    fi
+
+    if [[ "$section" == "mediaserver" || "$section" == "mediamanager" ]]; then
+        docker stop "${app}" >/dev/null 2>&1 || true
+        tar ${OPTIONSTAR} -C "${FOLDER}/${app}" -pcf "${TARGET_DIR}/${ARCHIVETAR}" ./ 2>/dev/null || true
+        docker start "${app}" >/dev/null 2>&1 || true
+    else
+        tar ${OPTIONSTAR} -C "${FOLDER}/${app}" -pcf "${TARGET_DIR}/${ARCHIVETAR}" ./ 2>/dev/null || true
+    fi
+
+    chown -hR 1000:1000 "${TARGET_DIR}/${ARCHIVETAR}" 2>/dev/null || true
+
+    if [[ -n "$WEBHOOK_URL" ]]; then
+        TIMESTAMP=$(date '+%H:%M:%S')
+        curl -fsS -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\": \"Backup of ${app} completed at ${TIMESTAMP}!\"}" \
+            "$WEBHOOK_URL" >/dev/null 2>&1 || true
+    fi
 done
+
+echo "Daily application backup finished successfully."

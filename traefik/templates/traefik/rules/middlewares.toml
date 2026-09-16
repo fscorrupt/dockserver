@@ -1,5 +1,5 @@
 ###############################################################
-#                   Treaifk configuration                     #
+#                   Traefik configuration                     #
 ###############################################################
 [http.middlewares]
   [http.middlewares.middlewares-rate-limit]
@@ -9,7 +9,7 @@
 
   [http.middlewares.middlewares-secure-headers]
     [http.middlewares.middlewares-secure-headers.headers]
-      accessControlAllowMethods= ["GET", "OPTIONS", "PUT", "POST"]
+      accessControlAllowMethods = ["GET", "OPTIONS", "PUT", "POST"]
       accessControlMaxAge = 100
       hostsProxyHeaders = ["X-Forwarded-Host"]
       sslRedirect = true
@@ -17,7 +17,7 @@
       stsIncludeSubdomains = true
       stsPreload = true
       forceSTSHeader = true
-      customFrameOptionsValue = "allow-from https:example.com" #CSP takes care of this but may be needed for organizr.
+      customFrameOptionsValue = "allow-from https://example.com"
       contentTypeNosniff = true
       browserXssFilter = true
       frameDeny = true
@@ -37,3 +37,39 @@
       address = "http://authelia:9091/api/verify?rd=https://authelia.example.com"
       trustForwardHeader = true
       authResponseHeaders = ["Remote-User", "Remote-Groups"]
+
+  [http.middlewares.middlewares-crowdsec-bouncer]
+    [http.middlewares.middlewares-crowdsec-bouncer.plugin.crowdsec-bouncer]
+      enabled = true
+      crowdsecMode = "stream"
+      crowdsecLapiScheme = "http"
+      crowdsecLapiHost = "crowdsec:8080"
+      crowdsecLapiKey = "CROWDSEC_BOUNCER_KEY_ID"
+      forwardedHeadersCustomName = "CF-Connecting-IP"
+      forwardedHeadersTrustedIPs = [
+        "173.245.48.0/20",
+        "103.21.244.0/22",
+        "103.22.200.0/22",
+        "103.31.4.0/22",
+        "141.101.64.0/18",
+        "108.162.192.0/18",
+        "190.93.240.0/20",
+        "188.114.96.0/20",
+        "197.234.240.0/22",
+        "198.41.128.0/17",
+        "162.158.0.0/15",
+        "104.16.0.0/12",
+        "172.64.0.0/13",
+        "131.0.72.0/22",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16"
+      ]
+
+  [http.middlewares.middlewares-compress]
+    [http.middlewares.middlewares-compress.compress]
+
+  [http.middlewares.middlewares-retry]
+    [http.middlewares.middlewares-retry.retry]
+      attempts = 3
+      initialInterval = "500ms"

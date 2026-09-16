@@ -1,133 +1,167 @@
-#!/bin/bash
-####################################
-# All rights reserved.              #
-# started from Zero                 #
-# Docker owned dockserver           #
-# Docker Maintainer dockserver      #
-#####################################
-#####################################
-# THE DOCKER ARE UNDER LICENSE      #
-# NO CUSTOMIZING IS ALLOWED         #
-# NO REBRANDING IS ALLOWED          #
-# NO CODE MIRRORING IS ALLOWED      #
-#####################################
-# shellcheck disable=SC2086
-# shellcheck disable=SC2006
-if [[ $EUID != 0 ]]; then
+#!/usr/bin/env bash
+# shellcheck shell=bash
+###############################################################
+# DockServer CLI Command Launcher                             #
+# Modernized for Ubuntu 24.04, 22.04 & Debian 12              #
+###############################################################
+set -e
+
+if [[ $EUID -ne 0 ]]; then
     sudo "$0" "$@"
     exit $?
 fi
-dockserver=/opt/dockserver
-run() {
-if [[ -d ${dockserver} ]];then
-   envmigra && fastapt && cleanup && clear
-   $(command -v cd) ${dockserver} && $(command -v bash) install.sh
-else
-   usage
-fi
-}
-####
-update() {
-dockserver=/opt/dockserver
-clear
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "    🚀    DockServer [ UPDATE CONTAINER ] STARTED"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-     basefolder="/opt/appdata"
-     compose="compose/docker-compose.yml"
-     $(command -v rsync) ${dockserver}/dockserver/docker.yml $basefolder/$compose -aqhv
-     if [[ -f $basefolder/$compose ]];then
-        $(command -v cd) $basefolder/compose/ && \
-          docker-compose config 1>/dev/null 2>&1 && \
-            docker-compose down 1>/dev/null 2>&1 && \
-            docker-compose up -d --force-recreate 1>/dev/null 2>&1
-     fi
-     $(command -v chown) -cR 1000:1000 ${dockserver} 1>/dev/null 2>&1
-     envmigra && fastapt && cleanup && clear
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "    🚀    DockServer [ UPDATE CONTAINER ] DONE"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-}
-####
-fastapp() {
-APP=${APP}
-  cd /opt/dockserver/
-  compose="compose/docker-compose.yaml"
-  appfolder="/opt/dockserver"
-  basefolder="/opt/appdata"
-  find /opt/dockserver/apps/ -type f -name '*${APP}*' -exec cp "{}" $basefolder/$compose \;
-  cd $basefolder/compose
-     docker-compose config > /dev/null
-     docker-compose pull > /dev/null
-     docker-compose up -d --force-recreate > /dev/null
-     rm -rf $basefolder/compose/docker-compo**
-  exit
-}
 
-####
-usage() {
-clear
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "    🚀    DockServer [ USAGE COMMANDS ]"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "   Commands :"
-echo ""
-echo "   dockserver -i / --install     =   open the dockserver setup"
-echo "   dockserver -h / --help        =   help/usage"
-echo "   dockserver -u / --update      =   deployed the update container"
-echo ""
-echo "   dockserver -a / --app <{NAMEOFAPP}>  =   fast app installation"
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "    🚀    DockServer [ USAGE COMMANDS ]"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-}
-
-envmigra() {
-basefolder="/opt/appdata"
 dockserver="/opt/dockserver"
-envmigrate="$dockserver/apps/.subactions/envmigrate.sh"
-if [[ -f "$basefolder/compose/.env" ]];then
-   $(command -v bash) $envmigrate
-fi 
+basefolder="/opt/appdata"
+env_file="$basefolder/compose/.env"
+
+# Detect Docker Compose CLI v2
+get_compose_cmd() {
+    if docker compose version >/dev/null 2>&1; then
+        echo "docker compose"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        echo "docker-compose"
+    else
+        echo "docker compose"
+    fi
+}
+DOCKER_COMPOSE=$(get_compose_cmd)
+
+sync_env() {
+    if [[ -f "$dockserver/apps/.subactions/envmigrate.sh" ]]; then
+        bash "$dockserver/apps/.subactions/envmigrate.sh"
+    fi
+    if [[ -f "$env_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$env_file"
+    fi
 }
 
-fastapt() {
-if ! type aria2c >/dev/null 2>&1; then
-   apt-get update -y && apt-get install --force-yes -y -qq aria2
-fi
-if ! [[ -f /etc/apt-fast.conf ]]; then
-      bash -c "$(curl -sL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh)"
-      echo debconf apt-fast/maxdownloads string 16 | debconf-set-selections
-      echo debconf apt-fast/dlflag boolean true | debconf-set-selections
-      echo debconf apt-fast/aptmanager string apt | debconf-set-selections
-fi
+run_installer() {
+    if [[ -d "$dockserver" ]]; then
+        sync_env
+        cd "$dockserver"
+        bash install.sh
+    else
+        echo "DockServer directory not found at $dockserver"
+        exit 1
+    fi
 }
 
-cleanup() {
-   find /var/log -type f -regex ".*\.gz$" -delete
-   find /var/log -type f -regex ".*\.[0-9]$" -delete
+run_migrate() {
+    if [[ -f "$dockserver/scripts/migrate.sh" ]]; then
+        bash "$dockserver/scripts/migrate.sh"
+    else
+        echo "Migration script not found at $dockserver/scripts/migrate.sh"
+        exit 1
+    fi
 }
 
-###
+set_mode() {
+    local mode="$1"
+    if [[ "$mode" == "local" || "$mode" == "cloud" ]]; then
+        sed -i "/^SERVER_MODE=/d" "$env_file" 2>/dev/null || true
+        echo "SERVER_MODE=$mode" >> "$env_file"
+        sync_env
+        echo "DockServer server environment mode set to: $mode"
+    else
+        echo "Invalid mode. Use 'cloud' or 'local'."
+        exit 1
+    fi
+}
 
-DOCK=$1
-APP=$2
+update_containers() {
+    clear
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "    🚀  DockServer [ UPDATE CONTAINERS ] STARTED"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    sync_env
+    if [[ -f "$basefolder/compose/docker-compose.yml" ]]; then
+        cd "$basefolder/compose"
+        $DOCKER_COMPOSE pull
+        $DOCKER_COMPOSE up -d --remove-orphans
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "    🚀  DockServer [ UPDATE CONTAINERS ] DONE"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
 
-case "$DOCK" in
- "" ) run ;;
- "-i" ) run ;;
- "--install" ) run ;;
- "-u" ) update ;;
- "--update" ) update ;;
- "-a" ) fastapp ;;
- "--app" ) fastapp ;;
- "-h" ) usage ;;
- "--help" ) usage ;;
+fastapp() {
+    local APP="$1"
+    if [[ -z "$APP" ]]; then
+        echo "Please specify an app name: dockserver -a <app_name>"
+        exit 1
+    fi
+    sync_env
 
+    local found_file
+    found_file=$(find "$dockserver/apps" -maxdepth 2 -type f -name "${APP}.yml" ! -path "*/.subactions/*" | head -n 1)
+
+    if [[ -n "$found_file" ]]; then
+        local cat_name
+        cat_name=$(basename "$(dirname "$found_file")")
+        echo "Deploying $APP from category $cat_name..."
+
+        # Check Local server restrictions
+        if [[ "${SERVER_MODE:-cloud}" == "local" && ("$APP" == "mount" || "$APP" == "uploader") ]]; then
+            echo "Error: '$APP' is a cloud-only utility and cannot be installed in Local Server mode."
+            exit 1
+        fi
+
+        local app_compose_dir="$basefolder/compose/apps/$APP"
+        mkdir -p "$app_compose_dir" "$basefolder/$APP"
+        cp -f "$found_file" "$app_compose_dir/docker-compose.yml"
+
+        cd "$app_compose_dir"
+        $DOCKER_COMPOSE --env-file "$env_file" pull || true
+        $DOCKER_COMPOSE --env-file "$env_file" up -d --force-recreate
+        echo "$APP deployed successfully."
+    else
+        echo "App '$APP' not found in $dockserver/apps"
+        exit 1
+    fi
+}
+
+usage() {
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "    🚀  DockServer CLI"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "   Commands:"
+    echo ""
+    echo "   dockserver -i | --install          Launch interactive configuration & setup"
+    echo "   dockserver -u | --update           Pull and recreate edge containers"
+    echo "   dockserver -m | --migrate          Run migration tool from legacy DockServer"
+    echo "   dockserver -a | --app <name>       Quickly deploy an application by name"
+    echo "   dockserver --mode <cloud|local>    Configure Server Mode (Cloud vs. Local)"
+    echo "   dockserver -h | --help             Show this help information"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+ACTION="$1"
+PARAM="$2"
+
+case "$ACTION" in
+    ""|-i|--install)
+        run_installer
+        ;;
+    -u|--update)
+        update_containers
+        ;;
+    -m|--migrate)
+        run_migrate
+        ;;
+    -a|--app)
+        fastapp "$PARAM"
+        ;;
+    --mode)
+        set_mode "$PARAM"
+        ;;
+    -h|--help)
+        usage
+        ;;
+    *)
+        usage
+        ;;
 esac
-
-#E-o-F#

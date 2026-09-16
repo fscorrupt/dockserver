@@ -1,48 +1,47 @@
-#!/usr/bin/with-contenv bash
+#!/usr/bin/env bash
+# shellcheck shell=bash
+###############################################################
+# DockServer - Host Security Hardening (Fail2ban & Bad IPs)   #
+###############################################################
+set -e
 
-sudo wget -qO- https://raw.githubusercontent.com/dockserver/dockserver/master/scripts/security/badips.sh | sudo bash -v
-sudo wget -O /opt/appdata/traefik/bann.sh https://raw.githubusercontent.com/dockserver/dockserver/master/scripts/security/traefik-bann.sh
-
-if [[ ! $(which screen) ]]; then
-   $(command -v apt) install screen -yqq && \
-   screen -S bannbadips -dm bash -xv /opt/appdata/traefik/bann.sh
-else
-   screen -S bannbadips -dm bash -xv /opt/appdata/traefik/bann.sh
+if [[ $EUID -ne 0 ]]; then
+    sudo "$0" "$@"
+    exit $?
 fi
 
-  cat > /etc/fail2ban/filter.d/log4j-jndi.conf << EOF; $(echo)
-# jay@gooby.org
-# https://jay.gooby.org/2021/12/13/a-fail2ban-filter-for-the-log4j-cve-2021-44228
-# https://gist.github.com/jaygooby/3502143639e09bb694e9c0f3c6203949
-# Thanks to https://gist.github.com/kocour for a better regex
+# Run badips blocklist
+if [[ -f "/opt/dockserver/scripts/security/badips.sh" ]]; then
+    bash "/opt/dockserver/scripts/security/badips.sh" || true
+fi
+
+# Fail2ban filters setup
+if command -v fail2ban-client >/dev/null 2>&1; then
+    mkdir -p /etc/fail2ban/filter.d /etc/fail2ban/jail.d
+
+    cat << 'EOF' > /etc/fail2ban/filter.d/log4j-jndi.conf
 [log4j-jndi]
 maxretry = 1
 enabled = true
 port = 80,443
-logpath = /opt/appdata/traefik/traefik.log
+logpath = /opt/appdata/traefik/logs/traefik.log
 EOF
 
-cat > /etc/fail2ban/filter.d/authelia.conf << EOF; $(echo)
+    cat << 'EOF' > /etc/fail2ban/filter.d/authelia.conf
 [authelia]
 enabled = true
 port = http,https,9091
 filter = authelia
 logpath = /opt/appdata/authelia/authelia.log
-maxretry = 2
-bantime = 90d
-findtime = 7d
+maxretry = 3
+bantime = 24h
+findtime = 1h
 chain = DOCKER-USER
 EOF
 
+    if systemctl is-active --quiet fail2ban; then
+        systemctl reload-or-restart fail2ban 2>/dev/null || true
+    fi
+fi
 
-grep -qE '#log4j
-[Definition]
-failregex   = (?i)^<HOST> .* ".*\$.*(7B|\{).*(lower:)?.*j.*n.*d.*i.*:.*".*?$' /etc/fail2ban/jail.local || \
- echo '#log4j
-[Definition]
-failregex   = (?i)^<HOST> .* ".*\$.*(7B|\{).*(lower:)?.*j.*n.*d.*i.*:.*".*?$' > /etc/fail2ban/jail.local
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-
-printf "${RED}dockserver.github.io Security Patch\n${NC} code @ doob1987\n"
+echo "Security hardening completed."

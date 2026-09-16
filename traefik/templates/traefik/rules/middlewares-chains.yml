@@ -1,17 +1,25 @@
 ###############################################################
-#                   Treaifk configuration                     #
+#                   Traefik configuration                     #
 ###############################################################
 http:
   middlewares:
     chain-no-auth:
       chain:
         middlewares:
+          - middlewares-crowdsec-bouncer
           - middlewares-rate-limit
           - middlewares-secure-headers
+          - middlewares-compress
+          - traefik-error-pages@docker
+          - middlewares-retry
 
     chain-authelia:
       chain:
         middlewares:
+          - middlewares-crowdsec-bouncer
           - middlewares-rate-limit
           - middlewares-secure-headers
+          - middlewares-compress
+          - traefik-error-pages@docker
           - middlewares-authelia
+          - middlewares-retry

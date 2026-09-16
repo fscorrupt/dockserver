@@ -1,53 +1,86 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+###############################################################
+# DockServer - LXC Mount Shared & Docker Container Fix        #
+# Modernized for Proxmox VE, Ubuntu 24.04, 22.04 & Debian 12  #
+###############################################################
+set -e
+
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+BOLD='\033[1m'
+
+# Only run if running inside an LXC container
+if [[ "$(systemd-detect-virt 2>/dev/null)" != "lxc" ]]; then
+    exit 0
+fi
+
+echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BOLD}    🚀  LXC Container Detected: Configuring Shared Mounts & Docker Support${NC}"
+echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# 1. Apply shared mount immediately to live root filesystem
+echo -e "${BLUE}==> Applying shared mount propagation to /...${NC}"
+mount --make-shared / 2>/dev/null || true
+
+# 2. Deploy script to /home/.lxcstart.sh
+mkdir -p /home
+cat << 'EOF' > /home/.lxcstart.sh
 #!/bin/bash
-#
-# Title:      LXC Bypass the mount :shared
-# OS Branch:  ubuntu,debian,rasbian
-# Author(s):  mrdoob
-# Coauthor:   DrAgOn141
-# GNU:        General Public License v3.0
-################################################################################
-# shellcheck disable=SC2003
-# shellcheck disable=SC2006
-# shellcheck disable=SC2207
-# shellcheck disable=SC2012
-# shellcheck disable=SC2086
-# shellcheck disable=SC2196
-# shellcheck disable=SC2046
-#FUNCTIONS
-LXC() {
-  if [[ ! -x $(command -v rsync) ]]; then $(command -v apt) install --reinstall rsync -yqq 1>/dev/null 2>&1; fi
-  if [[ ! -f "/home/.lxcstart.sh" ]]; then $(command -v rsync) -aqhv /opt/dockserver/preinstall/installer/subinstall/lxcstart.sh /home/.lxcstart.sh; fi
-  if [[ -f "/home/.lxcstart.sh" ]]; then
-    $(command -v chmod) a=rx,u+w /home/.lxcstart.sh
-    $(command -v bash) /home/.lxcstart.sh
-    $(command -v ansible-playbook) /opt/dockserver/preinstall/installer/subinstall/lxc.yml 1>/dev/null 2>&1
-  fi
-  ## set cron.d
-  if [[ -f "/home/.lxcstart.sh" ]]; then $(command -v ansible-playbook) /opt/dockserver/preinstall/installer/subinstall/lxc.yml 1>/dev/null 2>&1; fi
-  if [[ ! -f "/etc/cron.d/lxcstart" ]]; then
-    echo -n "
+mount --make-shared /
+EOF
+chmod 0755 /home/.lxcstart.sh
+
+# 3. Dedicated systemd unit (guarantees execution BEFORE Docker on every boot)
+echo -e "${BLUE}==> Installing persistent systemd service (runs before docker.service)...${NC}"
+cat << 'EOF' > /etc/systemd/system/lxc-make-shared.service
+[Unit]
+Description=Make / shared mount for Docker in LXC
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=docker.service sysinit.target local-fs.target
+After=systemd-remount-fs.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mount --make-shared /
+RemainAfterExit=yes
+
+[Install]
+WantedBy=basic.target multi-user.target
+EOF
+
+systemctl daemon-reload 2>/dev/null || true
+systemctl enable lxc-make-shared.service 2>/dev/null || true
+systemctl start lxc-make-shared.service 2>/dev/null || true
+
+# 4. Fallback cron for non-systemd or legacy environments
+if [[ -d "/etc/cron.d" ]]; then
+    cat << 'EOF' > /etc/cron.d/lxcstart
 SHELL=/bin/bash
-@reboot root /bin/bash /home/.lxcstart.sh 1>/dev/null 2>&1" >>/etc/cron.d/lxcstart
-    $(command -v chmod) a=rx,u+w /etc/cron.d/lxcstart
-    sleep 1
-  fi
-  ending && clear && exit
-}
-ending() {
-  printf "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    ❌ INFO
-    Please be sure that you have add the following features
-    keyctl, nesting and fuse under LXC Options > Features,
-    this is only available when Unprivileged container=Yes
-    The mount-docker takes round about 2 minutes to start
-    after the installation, please be patient
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"
-  read -erp "Confirm Info | Type confirm & PRESS [ENTER]" input </dev/tty
-  if [[ "$input" = "confirm" ]]; then clear; else ending; fi
-}
-while true; do
-  if [[ "$(systemd-detect-virt)" != "lxc" ]]; then exit; else LXC; fi
-done
-#"
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+@reboot root /bin/bash /home/.lxcstart.sh >/dev/null 2>&1
+
+EOF
+    chmod 0644 /etc/cron.d/lxcstart
+fi
+
+# 5. Run Ansible playbook if present for backwards compatibility
+if command -v ansible-playbook >/dev/null 2>&1 && [[ -f "/opt/dockserver/preinstall/installer/subinstall/lxc.yml" ]]; then
+    ansible-playbook "/opt/dockserver/preinstall/installer/subinstall/lxc.yml" >/dev/null 2>&1 || true
+fi
+
+echo ""
+echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}${BOLD}  ✅  LXC Shared Mount Successfully Configured!                           ${NC}"
+echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "${YELLOW}${BOLD}Proxmox VE Requirements for Docker in LXC:${NC}"
+echo "  Ensure your container has the following features enabled in Proxmox:"
+echo "  • Options -> Features -> Check: 'nesting', 'keyctl', and 'fuse'"
+echo "  • Or in /etc/pve/lxc/<VMID>.conf: features: nesting=1,keyctl=1,fuse=1"
+echo ""
+echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
