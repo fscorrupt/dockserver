@@ -238,6 +238,12 @@ runinstall() {
         cp -f "$appfolder/$cat/.overwrite/${app}.overwrite.yml" "$override_target"
     fi
 
+    # Clean up obsolete version attribute for modern Docker Compose v2
+    sed -i '/^version:/d' "$compose_target" 2>/dev/null || true
+    if [[ -f "$override_target" ]]; then
+        sed -i '/^version:/d' "$override_target" 2>/dev/null || true
+    fi
+
     # Ensure app data directory exists
     mkdir -p "$basefolder/$app"
     chown -hR 1000:1000 "$basefolder/$app" 2>/dev/null || true
