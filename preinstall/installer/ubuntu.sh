@@ -126,7 +126,28 @@ install_docker() {
         fi
 
         local codename
-        codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+        codename="$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")"
+        if [[ -z "$codename" ]] && command -v lsb_release >/dev/null 2>&1; then
+            codename="$(lsb_release -cs)"
+        fi
+        if [[ -z "$codename" ]]; then
+            if [[ "$lsb_dist" == "debian" ]]; then
+                codename="bookworm"
+            else
+                codename="noble"
+            fi
+        fi
+
+        # Live probe: if Docker repository does not exist for this codename (e.g. Ubuntu 26 / non-LTS releases),
+        # fallback to verified LTS to prevent apt 404 errors
+        local check_url="https://download.docker.com/linux/${lsb_dist}/dists/${codename}/Release"
+        if ! curl -fsSL --max-time 5 --head "$check_url" >/dev/null 2>&1; then
+            if [[ "$lsb_dist" == "debian" ]]; then
+                codename="bookworm"
+            else
+                codename="noble"
+            fi
+        fi
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${lsb_dist} ${codename} stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
         apt-get update -yqq
