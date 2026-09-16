@@ -27,6 +27,7 @@ echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━
 echo -e "${BLUE}==> Installing prerequisite packages...${NC}"
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
+export PYTHONWARNINGS="ignore"
 apt-get update -yqq
 apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" curl git jq tar pigz pv rsync ca-certificates gnupg
 

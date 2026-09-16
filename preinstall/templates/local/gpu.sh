@@ -79,9 +79,11 @@ setup_intel() {
 
     # Install VA-API and diagnostic tools
     export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    export PYTHONWARNINGS="ignore"
     apt-get update -yqq
-    apt-get install -yqq vainfo intel-media-va-driver-non-free 2>/dev/null || apt-get install -yqq vainfo intel-media-va-driver 2>/dev/null || true
-    apt-get install -yqq intel-gpu-tools 2>/dev/null || true
+    apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" vainfo intel-media-va-driver-non-free 2>/dev/null || apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" vainfo intel-media-va-driver 2>/dev/null || true
+    apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" intel-gpu-tools 2>/dev/null || true
 
     echo -e "${GREEN}Intel GPU tools and VA-API drivers installed.${NC}"
 }
@@ -90,9 +92,11 @@ setup_intel() {
 setup_amd() {
     echo -e "${CYAN}==> Configuring AMD Radeon / APU Hardware Acceleration...${NC}"
     export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    export PYTHONWARNINGS="ignore"
     apt-get update -yqq
-    apt-get install -yqq vainfo mesa-va-drivers mesa-vulkan-drivers 2>/dev/null || true
-    apt-get install -yqq radeontop 2>/dev/null || true
+    apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" vainfo mesa-va-drivers mesa-vulkan-drivers 2>/dev/null || true
+    apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" radeontop 2>/dev/null || true
 
     echo -e "${GREEN}AMD GPU VA-API drivers and diagnostic tools installed.${NC}"
 }
@@ -111,8 +115,10 @@ setup_nvidia() {
     fi
 
     export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    export PYTHONWARNINGS="ignore"
     apt-get update -yqq
-    apt-get install -yqq nvidia-container-toolkit 2>/dev/null || true
+    apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" nvidia-container-toolkit 2>/dev/null || true
 
     # Configure Docker daemon safely using official nvidia-ctk CLI
     if command -v nvidia-ctk >/dev/null 2>&1; then

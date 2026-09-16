@@ -14,6 +14,10 @@ RED='\033[0;31m'
 NC='\033[0m'
 BOLD='\033[1m'
 
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export PYTHONWARNINGS="ignore"
+
 basefolder="/opt/appdata"
 template_dir="/opt/dockserver/preinstall/templates/local"
 env_file="$basefolder/compose/.env"
@@ -102,13 +106,15 @@ configure_dns() {
 install_packages() {
     echo -e "${BLUE}Updating system packages and installing dependencies...${NC}"
     export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    export PYTHONWARNINGS="ignore"
     apt-get update -yqq
 
     local packages=(
         software-properties-common rsync pciutils lshw nano fuse curl wget
         tar pigz pv iptables ipset fail2ban jq ca-certificates gnupg python3
     )
-    apt-get install -yqq "${packages[@]}"
+    apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" "${packages[@]}"
 }
 
 install_docker() {
@@ -212,7 +218,7 @@ install_ansible() {
     # Install ansible from standard repositories on Ubuntu 22.04, 24.04 and Debian 12
     if ! command -v ansible >/dev/null 2>&1; then
         echo -e "${BLUE}Installing Ansible...${NC}"
-        apt-get install -yqq ansible dialog python3-lxml 2>/dev/null || true
+        apt-get install -yqq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" ansible dialog python3-lxml 2>/dev/null || true
     fi
 
     mkdir -p /etc/ansible/inventories
@@ -268,7 +274,7 @@ EOF
     if command -v ipset >/dev/null 2>&1; then
         ipset -q flush ips 2>/dev/null || true
         ipset -q create ips hash:net 2>/dev/null || true
-        for ip in $(curl --compressed -sSL https://raw.githubusercontent.com/scriptzteam/IP-BlockList-v4/master/ips.txt 2>/dev/null | grep -v "#" | grep -v -E "\s[1-2]$" | cut -f 1 | head -n 5000); do
+        for ip in $(curl --compressed -sSL https://raw.githubusercontent.com/scriptzteam/IP-BlockList-v4/master/ips.txt 2>/dev/null | grep -v "#" | grep -v -E '[[:space:]][1-2]$' | cut -f 1 | head -n 5000); do
             ipset add ips "$ip" 2>/dev/null || true
         done
         iptables -C INPUT -m set --match-set ips src -j DROP 2>/dev/null || iptables -I INPUT -m set --match-set ips src -j DROP 2>/dev/null || true

@@ -24,7 +24,7 @@ ipset -q create ips hash:net 2>/dev/null || true
 iplist=$(curl --compressed -sSL --max-time 15 https://raw.githubusercontent.com/scriptzteam/IP-BlockList-v4/master/ips.txt 2>/dev/null || true)
 
 if [[ -n "$iplist" ]]; then
-    echo "$iplist" | grep -v "#" | grep -v -E "\s[1-2]$" | cut -f 1 | head -n 5000 | while read -r ip; do
+    echo "$iplist" | grep -v "#" | grep -v -E '[[:space:]][1-2]$' | cut -f 1 | head -n 5000 | while read -r ip; do
         if [[ -n "$ip" ]]; then
             ipset add ips "$ip" 2>/dev/null || true
         fi
