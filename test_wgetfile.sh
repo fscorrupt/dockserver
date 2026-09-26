@@ -158,7 +158,7 @@ fi
 # Target fork repository and branch
 dockserver_dir="/opt/dockserver"
 test_repo="${DOCKSERVER_REPO:-https://github.com/fscorrupt/dockserver.git}"
-test_branch="${DOCKSERVER_BRANCH:-master}"
+test_branch="${DOCKSERVER_BRANCH:-dev}"
 
 if [[ -d "$dockserver_dir/.git" ]]; then
     echo -e "${BLUE}==> Existing /opt/dockserver detected. Updating from $test_repo ($test_branch)...${NC}"
